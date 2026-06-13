@@ -1,0 +1,23 @@
+# ── Python backend (SyncTune/) ──────────────────────────────
+__pycache__/
+*.py[cod]
+.env
+.venv/
+venv/
+env/
+*.db
+*.sqlite3
+storage/
+
+# ── Android root-level cache ─────────────────────────────────
+.gradle/
+
+# ── IDE ──────────────────────────────────────────────────────
+.idea/
+*.iml
+.vscode/
+
+# ── OS ───────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
