@@ -1,0 +1,17 @@
+﻿# FamilyHub backend configuration example
+# Copy this file to familyhub.config or export the variables from systemd/bash.
+
+FAMILYHUB_PUBLIC_BASE_URL=https://your-domain.example
+FAMILYHUB_DATABASE_URL=sqlite:////opt/familyhub/backend/familyhub.db
+FAMILYHUB_STORAGE_DIR=/opt/familyhub/storage
+FAMILYHUB_UPLOADS_DIR=/opt/familyhub/storage/uploads
+FAMILYHUB_DEFAULT_MAX_DEVICES=2
+
+# LiveKit is the mobile-first WebRTC media service for FamilyHubApp native live rooms.
+FAMILYHUB_LIVEKIT_URL=wss://your-domain.example/livekit
+FAMILYHUB_LIVEKIT_API_KEY=
+FAMILYHUB_LIVEKIT_API_SECRET=
+
+# Legacy services are referenced, not modified, by FamilyHubBackend.
+FAMILYHUB_LEGACY_LIVESTREAM_BASE_URL=https://your-domain.example
+FAMILYHUB_LEGACY_CINEMA_BASE_URL=https://your-domain.example/cinema
