@@ -1,4 +1,4 @@
-﻿import uuid
+import uuid
 from datetime import datetime
 from sqlalchemy import Boolean, Column, String, Integer, DateTime, ForeignKey, UniqueConstraint
 from database import Base
@@ -89,3 +89,17 @@ class Friendship(Base):
     user_id = Column(String, ForeignKey("users.id"), primary_key=True)
     friend_id = Column(String, ForeignKey("users.id"), primary_key=True)
     created_at = Column(DateTime, default=datetime.utcnow)
+class LiveRoom(Base):
+    __tablename__ = "live_rooms"
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    title = Column(String, nullable=False)
+    owner_id = Column(String, ForeignKey("users.id"), nullable=False)
+    status = Column(String, nullable=False, default="live")
+    source_type = Column(String, nullable=False, default="camera")
+    quality = Column(String, nullable=False, default="original")
+    livekit_room_name = Column(String, nullable=False, unique=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    started_at = Column(DateTime, default=datetime.utcnow)
+    heartbeat_at = Column(DateTime, nullable=True)
+    ended_at = Column(DateTime, nullable=True)

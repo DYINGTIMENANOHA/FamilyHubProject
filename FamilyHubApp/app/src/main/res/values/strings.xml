@@ -576,4 +576,36 @@
     <string name="artist_separator_helper_text">To add multiple artists, separate them with: %1$s</string>
     <string name="go_to_artist">Go to artist</string>
 
+    <string name="familyhub_hub">Hub</string>
+    <string name="familyhub_live">Live</string>
+    <string name="familyhub_cinema">Cinema</string>
+    <string name="familyhub_cinema_watch">Watch Cinema</string>
+    <string name="familyhub_cinema_admin">Cinema Admin</string>
+    <string name="familyhub_livestream">OBS Livestream</string>
+    <string name="familyhub_music">Music</string>
+    <string name="familyhub_cloud_music">Cloud Music</string>
+    <string name="familyhub_more">More</string>
+    <string name="familyhub_open">Open</string>
+    <string name="familyhub_refresh">Refresh</string>
+    <string name="familyhub_play">Play</string>
+    <string name="familyhub_pause">Pause</string>
+    <string name="familyhub_stop">Stop</string>
+    <string name="familyhub_fullscreen">Fullscreen</string>
+    <string name="familyhub_landscape">Landscape</string>
+    <string name="familyhub_portrait">Portrait</string>
+    <string name="familyhub_login_required">Please log in first.</string>
+    <string name="familyhub_live_status">Ready for LiveKit and SRS integration</string>
+    <string name="familyhub_cinema_status">Ready for existing cinema stream integration</string>
+    <string name="familyhub_cinema_choose_status">Choose Cinema watch mode or admin console</string>
+    <string name="familyhub_livestream_status">Watch the existing OBS/SRS livestream</string>
+    <string name="familyhub_more_status">Reserved for upcoming FamilyHub modules</string>
+    <string name="familyhub_cloud_music_loading">Loading cloud music...</string>
+    <string name="familyhub_cloud_music_empty">No cloud music yet.</string>
+    <string name="familyhub_cloud_music_count">%1$d cloud tracks</string>
+    <string name="familyhub_cloud_music_load_failed">Could not load cloud music.</string>
+    <string name="familyhub_cloud_music_idle">No cloud track playing.</string>
+    <string name="familyhub_cloud_music_preparing">Preparing %1$s...</string>
+    <string name="familyhub_cloud_music_now_playing">Playing %1$s</string>
+    <string name="familyhub_cloud_music_play_failed">Could not play this cloud track.</string>
+    <string name="familyhub_cloud_music_track">Cloud track</string>
 </resources>

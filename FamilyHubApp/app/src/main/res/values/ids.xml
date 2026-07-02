@@ -30,4 +30,8 @@
     <item name="action_go_to_start_directory" type="id" />
     <item name="action_friends" type="id" />
     <item name="action_room_control" type="id" />
+    <item name="action_familyhub_home" type="id" />
+    <item name="action_live" type="id" />
+    <item name="action_cinema" type="id" />
+    <item name="action_more" type="id" />
 </resources>

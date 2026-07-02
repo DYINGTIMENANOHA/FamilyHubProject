@@ -4,6 +4,7 @@ import time
 
 from fastapi import APIRouter, Query, WebSocket, WebSocketDisconnect
 
+from auth import authenticate_token
 from database import SessionLocal
 from models import User
 from services.sync_manager import manager
@@ -13,19 +14,17 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-# ── Permission helper ──────────────────────────────────────────────────────────
-
+# Permission helper
 def _can_send_sync(room, user_id: str) -> bool:
     return user_id == room.host_id or room.allow_guest_control
 
 
-# ── Message dispatcher ─────────────────────────────────────────────────────────
-
+# Message dispatcher
 async def _handle(msg: dict, user: User, db) -> None:
     uid = user.id
     mtype = msg.get("type", "")
 
-    # ── ROOM_JOIN ──────────────────────────────────────────────────────────────
+    # ROOM_JOIN
     if mtype == "ROOM_JOIN":
         host_id = msg.get("host_id")
         if not host_id:
@@ -38,7 +37,6 @@ async def _handle(msg: dict, user: User, db) -> None:
             await manager.send_to(uid, {"type": "ERROR", "detail": "cannot_follow_self"})
             return
 
-        # Auto-create room for host if none exists
         room = room_manager.get_room_by_host(host_id)
         if room is None:
             room = room_manager.create_room(host_id)
@@ -59,7 +57,6 @@ async def _handle(msg: dict, user: User, db) -> None:
         host_user = db.query(User).filter(User.id == host_id).first()
         host_nickname = host_user.nickname if host_user else host_id
 
-        # Send current room state to the new follower
         await manager.send_to(uid, {
             "type": "ROOM_STATE",
             "role": "FOLLOWING",
@@ -72,7 +69,7 @@ async def _handle(msg: dict, user: User, db) -> None:
             "timestamp": int(time.time() * 1000),
             "allow_guest_control": room.allow_guest_control,
         })
-        # Notify existing members that a new follower joined
+
         for mid in room.member_ids:
             if mid != uid:
                 await manager.send_to(mid, {
@@ -82,11 +79,11 @@ async def _handle(msg: dict, user: User, db) -> None:
                     "joined": uid,
                 })
         logger.info(
-            f"[WS][ROOM_JOIN] follower={user.nickname!r} → "
+            f"[WS][ROOM_JOIN] follower={user.nickname!r} -> "
             f"host={host_nickname!r} room={room.id}"
         )
 
-    # ── ROOM_LEAVE ─────────────────────────────────────────────────────────────
+    # ROOM_LEAVE
     elif mtype == "ROOM_LEAVE":
         room, dissolved, affected = room_manager.leave_room(uid)
         if room is None:
@@ -113,7 +110,7 @@ async def _handle(msg: dict, user: User, db) -> None:
                 })
             logger.info(f"[WS][ROOM_LEAVE] follower={user.nickname!r} left room={room.id}")
 
-    # ── ROOM_SETTINGS ──────────────────────────────────────────────────────────
+    # ROOM_SETTINGS
     elif mtype == "ROOM_SETTINGS":
         room = room_manager.get_room_by_user(uid)
         if room is None or room.host_id != uid:
@@ -129,14 +126,13 @@ async def _handle(msg: dict, user: User, db) -> None:
             })
         logger.info(f"[WS][ROOM_SETTINGS] host={user.nickname!r} allow_guest_control={allow}")
 
-    # ── ROOM_CATCHUP ───────────────────────────────────────────────────────────
+    # ROOM_CATCHUP
     elif mtype == "ROOM_CATCHUP":
         room = room_manager.get_room_by_user(uid)
         if room is None:
             await manager.send_to(uid, {"type": "ERROR", "detail": "not_in_room"})
             return
         if room.track_id is None:
-            # 房间刚建立，host 还没报告播放状态，告知客户端等待 host 广播即可
             await manager.send_to(uid, {"type": "ACK", "detail": "no_track_yet"})
             logger.info(f"[WS][ROOM_CATCHUP] room has no track yet, told follower={user.nickname!r} to wait")
             return
@@ -153,7 +149,7 @@ async def _handle(msg: dict, user: User, db) -> None:
             f"track={room.track_id} pos={room.position_ms}"
         )
 
-    # ── SYNC_ALL ───────────────────────────────────────────────────────────────
+    # SYNC_ALL
     elif mtype == "SYNC_ALL":
         room = room_manager.get_room_by_user(uid)
         if room is None:
@@ -190,7 +186,7 @@ async def _handle(msg: dict, user: User, db) -> None:
             f"pos={position_ms} playing={is_playing} notified={sent}"
         )
 
-    # ── SYNC_PLAY / SYNC_PAUSE / SYNC_SEEK ────────────────────────────────────
+    # SYNC_PLAY / SYNC_PAUSE / SYNC_SEEK
     elif mtype in ("SYNC_PLAY", "SYNC_PAUSE", "SYNC_SEEK"):
         room = room_manager.get_room_by_user(uid)
         if room is None:
@@ -221,13 +217,12 @@ async def _handle(msg: dict, user: User, db) -> None:
         await manager.send_to(uid, {"type": "ACK", "echo": msg})
 
 
-# ── WebSocket endpoint ─────────────────────────────────────────────────────────
-
+# WebSocket endpoint
 @router.websocket("/ws")
 async def websocket_endpoint(ws: WebSocket, token: str = Query(...)):
     db = SessionLocal()
     try:
-        user = db.query(User).filter(User.token == token).first()
+        user = authenticate_token(db, token)
         if not user:
             logger.warning(f"[WS][AUTH] rejected token={token[:8]}...")
             await ws.close(code=4001, reason="Invalid token")
@@ -235,9 +230,7 @@ async def websocket_endpoint(ws: WebSocket, token: str = Query(...)):
 
         logger.info(f"[WS][AUTH] accepted user_id={user.id} nick={user.nickname!r}")
 
-        # If host reconnects within grace period, cancel scheduled dissolve
         room_manager.cancel_host_dissolve(user.id)
-
         await manager.connect(user.id, ws, db)
 
         try:
@@ -256,7 +249,6 @@ async def websocket_endpoint(ws: WebSocket, token: str = Query(...)):
             logger.info(f"[WS][DISCONNECT] nick={user.nickname!r} code={e.code}")
             await manager.disconnect(user.id, db)
 
-            # If this user is a host, schedule grace-period dissolve
             room = room_manager.get_room_by_host(user.id)
             if room:
                 logger.info(

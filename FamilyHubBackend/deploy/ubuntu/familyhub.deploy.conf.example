@@ -1,0 +1,53 @@
+# FamilyHub Ubuntu deployment config
+# Copy to familyhub.deploy.conf and edit, or let deploy-familyhub.sh ask you.
+
+DOMAIN=streamforsoul.com
+PUBLIC_BASE_PATH=/familyhub
+PUBLIC_BASE_URL=https://streamforsoul.com:8443/familyhub
+
+# LiveKit defaults to a path on the same domain. If you later create a subdomain,
+# set this to wss://livekit.streamforsoul.com instead and adjust nginx manually.
+LIVEKIT_PUBLIC_URL=wss://streamforsoul.com:8443/livekit/
+
+# Existing Cinema/Auth system. FamilyHubApp opens Cinema through a one-time
+# FamilyHub launch link, then redirects into this existing Cinema service.
+CINEMA_BASE_URL=https://streamforsoul.com:8443/cinema/
+LIVESTREAM_BASE_URL=https://streamforsoul.com:8443/
+AUTH_TOKENS_DB=/opt/auth/data/tokens.db
+AUTH_KEYS_DIR=/opt/auth/keys
+INTEGRATION_LAUNCH_TTL_SECONDS=120
+# Optional fallbacks. Prefer keeping these blank so FamilyHub reads existing auth.
+CINEMA_WATCH_TOKEN=
+CINEMA_ADMIN_TOKEN=
+LIVESTREAM_WATCH_TOKEN=
+LIVESTREAM_TEST_WATCH_TOKEN=
+INTEGRATION_ADMINS=alice
+
+INSTALL_ROOT=/opt/familyhub
+BACKEND_DIR=/opt/familyhub/backend
+STORAGE_DIR=/opt/familyhub/storage
+UPLOADS_DIR=/opt/familyhub/storage/uploads
+DATABASE_URL=sqlite:////opt/familyhub/backend/familyhub.db
+
+BACKEND_HOST=127.0.0.1
+BACKEND_PORT=8891
+BACKEND_USER=www-data
+BACKEND_GROUP=www-data
+
+INSTALL_LIVEKIT=yes
+LIVEKIT_HTTP_PORT=7880
+LIVEKIT_TCP_PORT=7881
+LIVEKIT_UDP_PORT=7882
+# This server currently needs an explicit public node IP. Keep this set unless
+# the cloud public IP changes, otherwise LiveKit may panic during NAT discovery.
+LIVEKIT_NODE_IP=103.30.77.178
+LIVEKIT_API_KEY=familyhub
+LIVEKIT_API_SECRET=
+
+CONFIGURE_NGINX=yes
+PREVIEW_NGINX_CONFIG=yes
+NGINX_SITE_CONF=/etc/nginx/sites-available/livestream
+NGINX_SNIPPET=/etc/nginx/snippets/familyhub-locations.conf
+
+# Set to yes if you use UFW and want the script to open the LiveKit RTC ports.
+CONFIGURE_UFW=no

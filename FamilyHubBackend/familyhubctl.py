@@ -1,7 +1,10 @@
-﻿import argparse
+import argparse
+import logging
 import secrets
 import uuid
 from datetime import datetime
+
+logging.getLogger("passlib.handlers.bcrypt").setLevel(logging.ERROR)
 
 from passlib.context import CryptContext
 

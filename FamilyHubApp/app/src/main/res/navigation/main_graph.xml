@@ -2,7 +2,30 @@
 <navigation xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
-    app:startDestination="@id/action_home">
+    app:startDestination="@id/action_familyhub_home">
+    <fragment
+        android:id="@+id/action_familyhub_home"
+        android:name="code.name.monkey.retromusic.fragments.familyhub.FamilyHubHomeFragment"
+        android:label="FamilyHub"
+        tools:layout="@layout/fragment_familyhub_home" />
+
+    <fragment
+        android:id="@+id/action_live"
+        android:name="code.name.monkey.retromusic.fragments.familyhub.FamilyHubLiveFragment"
+        android:label="Live"
+        tools:layout="@layout/fragment_familyhub_feature" />
+
+    <fragment
+        android:id="@+id/action_cinema"
+        android:name="code.name.monkey.retromusic.fragments.familyhub.FamilyHubCinemaFragment"
+        android:label="Cinema"
+        tools:layout="@layout/fragment_familyhub_feature" />
+
+    <fragment
+        android:id="@+id/action_more"
+        android:name="code.name.monkey.retromusic.fragments.familyhub.FamilyHubMoreFragment"
+        android:label="More"
+        tools:layout="@layout/fragment_familyhub_feature" />
 
     <fragment
         android:id="@+id/friends_fragment"

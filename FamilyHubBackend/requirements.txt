@@ -4,4 +4,5 @@ sqlalchemy>=2.0.0
 python-multipart>=0.0.9
 aiofiles>=23.2.1
 mutagen>=1.47.0
-passlib[bcrypt]>=1.7.4
+passlib>=1.7.4
+bcrypt>=4.0.1,<4.1.0

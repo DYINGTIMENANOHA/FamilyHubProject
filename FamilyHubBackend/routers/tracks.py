@@ -9,8 +9,9 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from config import UPLOADS_DIR
+from auth import get_current_user
 from database import get_db
-from models import Track
+from models import Track, User
 
 router = APIRouter()
 
@@ -37,7 +38,11 @@ def _extract_metadata(file_path: Path, original_filename: str):
 
 
 @router.post("/upload")
-async def upload_track(file: UploadFile = File(...), db: Session = Depends(get_db)):
+async def upload_track(
+    file: UploadFile = File(...),
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
     suffix = Path(file.filename).suffix.lower()
     if suffix not in ALLOWED_EXTENSIONS:
         raise HTTPException(status_code=400, detail=f"Unsupported file type: {suffix}")
@@ -58,6 +63,7 @@ async def upload_track(file: UploadFile = File(...), db: Session = Depends(get_d
         duration_ms=duration_ms,
         file_path=str(dest),
         source="upload",
+        uploaded_by=user.id,
     )
     db.add(track)
     db.commit()
@@ -72,7 +78,7 @@ async def upload_track(file: UploadFile = File(...), db: Session = Depends(get_d
 
 
 @router.get("/tracks")
-def get_tracks(db: Session = Depends(get_db)):
+def get_tracks(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     tracks = db.query(Track).order_by(Track.created_at.desc()).all()
     return [
         {
@@ -88,7 +94,11 @@ def get_tracks(db: Session = Depends(get_db)):
 
 
 @router.get("/tracks/{track_id}")
-def get_track(track_id: str, db: Session = Depends(get_db)):
+def get_track(
+    track_id: str,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
     track = db.query(Track).filter(Track.id == track_id).first()
     if not track:
         raise HTTPException(status_code=404, detail="Track not found")
@@ -103,7 +113,12 @@ def get_track(track_id: str, db: Session = Depends(get_db)):
 
 
 @router.get("/stream/{track_id}")
-async def stream_track(track_id: str, request: Request, db: Session = Depends(get_db)):
+async def stream_track(
+    track_id: str,
+    request: Request,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
     track = db.query(Track).filter(Track.id == track_id).first()
     if not track:
         raise HTTPException(status_code=404, detail="Track not found")

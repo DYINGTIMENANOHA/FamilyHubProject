@@ -1,0 +1,135 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:fitsSystemWindows="true"
+    android:background="#000000">
+
+    <!-- Remote video stream (full screen background) -->
+    <io.livekit.android.renderer.SurfaceViewRenderer
+        android:id="@+id/live_remote_video"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:visibility="invisible" />
+
+    <!-- Local camera preview (top-right corner, host only) -->
+    <io.livekit.android.renderer.SurfaceViewRenderer
+        android:id="@+id/live_local_preview"
+        android:layout_width="112dp"
+        android:layout_height="150dp"
+        android:layout_gravity="top|end"
+        android:layout_marginTop="64dp"
+        android:layout_marginEnd="12dp"
+        android:elevation="8dp"
+        android:visibility="gone" />
+
+    <!-- Top bar: title + status -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="top"
+        android:background="#88000000"
+        android:orientation="horizontal"
+        android:padding="12dp"
+        android:gravity="center_vertical">
+
+        <TextView
+            android:id="@+id/live_title"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:textColor="#FFFFFF"
+            android:textSize="16sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/live_status"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Connecting..."
+            android:textColor="#AAFFFFFF"
+            android:textSize="13sp" />
+
+    </LinearLayout>
+
+    <!-- Bottom controls -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom"
+        android:background="#AA000000"
+        android:orientation="vertical"
+        android:padding="8dp">
+
+        <LinearLayout
+            android:id="@+id/live_host_controls"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_mic"
+                android:layout_width="0dp"
+                android:layout_height="48dp"
+                android:layout_weight="1"
+                android:layout_margin="4dp"
+                android:text="Mute"
+                android:textColor="#FFFFFF"
+                android:textSize="11sp"
+                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                app:strokeColor="#AAFFFFFF" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_cam"
+                android:layout_width="0dp"
+                android:layout_height="48dp"
+                android:layout_weight="1"
+                android:layout_margin="4dp"
+                android:text="Cam Off"
+                android:textColor="#FFFFFF"
+                android:textSize="11sp"
+                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                app:strokeColor="#AAFFFFFF" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_quality"
+                android:layout_width="0dp"
+                android:layout_height="48dp"
+                android:layout_weight="1"
+                android:layout_margin="4dp"
+                android:text="Ultra"
+                android:textColor="#FFFFFF"
+                android:textSize="11sp"
+                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                app:strokeColor="#AAFFFFFF" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_flip_cam"
+                android:layout_width="0dp"
+                android:layout_height="48dp"
+                android:layout_weight="1"
+                android:layout_margin="4dp"
+                android:text="Flip"
+                android:textColor="#FFFFFF"
+                android:textSize="11sp"
+                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                app:strokeColor="#AAFFFFFF" />
+
+        </LinearLayout>
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn_end"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:layout_margin="4dp"
+            android:text="End"
+            android:textColor="#FFFFFF"
+            android:textSize="12sp"
+            app:backgroundTint="#CC3333" />
+
+    </LinearLayout>
+
+</FrameLayout>

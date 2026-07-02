@@ -19,4 +19,6 @@ Existing external systems such as `LiveStreamCinemaAndAuthSystem` are not modifi
 
 ## Current Migration Stage
 
-The first migration pass renames the project from SyncTune to FamilyHub and lays down the backend module skeleton without deleting the existing music/sync behavior.
+The app shell, FamilyHub backend account flow, native LiveKit rooms, Android camera/screen sharing, cloud deployment scripts, and Cinema launch bridge are now in active test shape.
+
+See `DEPLOYMENT_STATUS.md` for the current known-good local/cloud configuration, Android endpoint switching commands, service management commands, verified live-room behavior, and the Cinema WebView integration status.

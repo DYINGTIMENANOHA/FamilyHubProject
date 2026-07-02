@@ -23,11 +23,11 @@ import android.view.Menu
 import android.view.MenuItem
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.flow.collectLatest
-import androidx.navigation.contains
 import androidx.navigation.ui.setupWithNavController
 import code.name.monkey.retromusic.R
 import code.name.monkey.retromusic.RoomRole
 import code.name.monkey.retromusic.SyncController
+import code.name.monkey.retromusic.SyncTuneApi
 import code.name.monkey.retromusic.SyncTuneSession
 import code.name.monkey.retromusic.SyncTuneWebSocketManager
 import code.name.monkey.retromusic.fragments.room.RoomControlSheet
@@ -36,7 +36,6 @@ import code.name.monkey.retromusic.extensions.*
 import code.name.monkey.retromusic.helper.MusicPlayerRemote
 import code.name.monkey.retromusic.helper.SearchQueryHelper.getSongs
 import code.name.monkey.retromusic.interfaces.IScrollHelper
-import code.name.monkey.retromusic.model.CategoryInfo
 import code.name.monkey.retromusic.model.Song
 import code.name.monkey.retromusic.repository.PlaylistSongsLoader
 import code.name.monkey.retromusic.service.MusicService
@@ -56,6 +55,7 @@ class MainActivity : AbsCastActivity() {
     }
 
     private val wsManager: SyncTuneWebSocketManager by inject()
+    private val api: SyncTuneApi by inject()
     private val syncController: SyncController by inject()
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -69,7 +69,7 @@ class MainActivity : AbsCastActivity() {
             return
         }
         Log.i(LOG_TAG, "onCreate: user=${SyncTuneSession.nickname}")
-
+        validateSession()
         setTaskDescriptionColorAuto()
         hideStatusBar()
         updateTabs()
@@ -83,13 +83,31 @@ class MainActivity : AbsCastActivity() {
             wsManager.connect(token)
         }
 
-        // Start sync controller (idempotent — safe to call on config change)
+        // Start sync controller (idempotent 闂?safe to call on config change)
         syncController.start()
         Log.i(LOG_TAG, "SyncController started")
 
         WhatsNewFragment.showChangeLog(this)
     }
 
+    private fun validateSession() {
+        val token = SyncTuneSession.token ?: return
+        lifecycleScope.launch {
+            runCatching { api.me(token) }
+                .onSuccess { user ->
+                    Log.i(LOG_TAG, "session valid: nickname=${user.nickname} maxDevices=${user.max_devices}")
+                }
+                .onFailure { error ->
+                    Log.w(LOG_TAG, "session invalid, returning to login: ${error.message}")
+                    SyncTuneSession.clear()
+                    wsManager.disconnect()
+                    startActivity(Intent(this@MainActivity, LoginActivity::class.java).apply {
+                        flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+                    })
+                    finish()
+                }
+        }
+    }
     override fun onDestroy() {
         super.onDestroy()
         Log.i(LOG_TAG, "onDestroy: disconnecting WebSocket")
@@ -150,22 +168,7 @@ class MainActivity : AbsCastActivity() {
         val navInflater = navController.navInflater
         val navGraph = navInflater.inflate(R.navigation.main_graph)
 
-        val categoryInfo: CategoryInfo = PreferenceUtil.libraryCategory.first { it.visible }
-        if (categoryInfo.visible) {
-            if (!navGraph.contains(PreferenceUtil.lastTab)) PreferenceUtil.lastTab =
-                categoryInfo.category.id
-            navGraph.setStartDestination(
-                if (PreferenceUtil.rememberLastTab) {
-                    PreferenceUtil.lastTab.let {
-                        if (it == 0) {
-                            categoryInfo.category.id
-                        } else {
-                            it
-                        }
-                    }
-                } else categoryInfo.category.id
-            )
-        }
+        navGraph.setStartDestination(R.id.action_familyhub_home)
         navController.graph = navGraph
         navigationView.setupWithNavController(navController)
         // Scroll Fragment to top
@@ -181,7 +184,7 @@ class MainActivity : AbsCastActivity() {
                 currentFragment(R.id.fragment_container)?.enterTransition = null
             }
             when (destination.id) {
-                R.id.action_home, R.id.action_song, R.id.action_album, R.id.action_artist, R.id.action_folder, R.id.action_playlist, R.id.action_genre, R.id.action_search -> {
+                R.id.action_familyhub_home, R.id.action_live, R.id.action_cinema, R.id.action_home, R.id.action_more, R.id.action_song, R.id.action_album, R.id.action_artist, R.id.action_folder, R.id.action_playlist, R.id.action_genre, R.id.action_search -> {
                     // Save the last tab
                     if (PreferenceUtil.rememberLastTab) {
                         saveTab(destination.id)

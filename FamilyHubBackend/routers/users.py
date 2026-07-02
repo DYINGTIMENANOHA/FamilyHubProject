@@ -163,9 +163,7 @@ def search_users(q: str, user: User = Depends(get_current_user), db: Session = D
     return [{"id": u.id, "nickname": u.nickname} for u in results]
 
 
-# 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 # Friend Requests
-# 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 
 @router.post("/friend-requests", status_code=201)
 def send_friend_request(body: FriendRequestCreate, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
@@ -245,7 +243,7 @@ def accept_friend_request(request_id: str, user: User = Depends(get_current_user
     sender = db.query(User).filter(User.id == req.from_user_id).first()
     logger.info(
         f"[FRIEND] accepted: request_id={request_id} "
-        f"pair=({sender.nickname if sender else req.from_user_id!r} 鈫?{user.nickname!r})"
+        f"pair=({sender.nickname if sender else req.from_user_id!r} -> {user.nickname!r})"
     )
     return {"detail": "accepted", "friend_id": req.from_user_id}
 
@@ -268,9 +266,7 @@ def reject_friend_request(request_id: str, user: User = Depends(get_current_user
     return {"detail": "rejected"}
 
 
-# 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 # Friends List
-# 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 
 @router.get("/friends")
 def list_friends(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
@@ -304,13 +300,11 @@ def remove_friend(friend_id: str, user: User = Depends(get_current_user), db: Se
     if f2:
         db.delete(f2)
     db.commit()
-    logger.info(f"[FRIEND] removed: pair=({user.id} 鈫?{friend_id})")
+    logger.info(f"[FRIEND] removed: pair=({user.id} -> {friend_id})")
     return {"detail": "removed"}
 
 
-# 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 # User State (Phase 3 stub)
-# 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 
 @router.get("/{user_id}/state")
 def get_user_state(user_id: str, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
@@ -324,5 +318,5 @@ def get_user_state(user_id: str, user: User = Depends(get_current_user), db: Ses
         "user_id": target.id,
         "nickname": target.nickname,
         "online": online,
-        "role": "SOLO",   # SOLO | HOST | LISTENER 鈥?Phase 3
+        "role": "SOLO",   # SOLO | HOST | LISTENER in phase 3
     }

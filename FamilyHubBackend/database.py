@@ -5,7 +5,10 @@ from config import DATABASE_URL
 
 logger = logging.getLogger(__name__)
 
-engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
+engine_kwargs = {}
+if DATABASE_URL.startswith("sqlite"):
+    engine_kwargs["connect_args"] = {"check_same_thread": False}
+engine = create_engine(DATABASE_URL, **engine_kwargs)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 
@@ -31,11 +34,16 @@ def _add_column_if_missing(conn, table: str, column: str, ddl: str) -> None:
 
 
 def _migrate() -> None:
+    if not DATABASE_URL.startswith("sqlite"):
+        logger.info("[MIGRATE] Skipping lightweight SQLite migrations for non-SQLite database")
+        return
+
     with engine.connect() as conn:
         _add_column_if_missing(conn, "users", "password_hash", "password_hash TEXT")
         _add_column_if_missing(conn, "users", "status", "status TEXT NOT NULL DEFAULT 'active'")
         _add_column_if_missing(conn, "users", "max_devices", "max_devices INTEGER NOT NULL DEFAULT 2")
         _add_column_if_missing(conn, "users", "disabled_at", "disabled_at DATETIME")
+        _add_column_if_missing(conn, "live_rooms", "heartbeat_at", "heartbeat_at DATETIME")
 
         dup = conn.execute(
             text("SELECT nickname, COUNT(*) c FROM users GROUP BY nickname HAVING c > 1")

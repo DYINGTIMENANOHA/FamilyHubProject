@@ -32,6 +32,8 @@
         android:name="android.permission.BLUETOOTH_CONNECT"
         android:usesPermissionFlags="neverForLocation"
         tools:targetApi="s" />
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
 
     <application
         android:name=".App"
@@ -141,6 +143,26 @@
                 <data android:mimeType="vnd.android.cursor.dir/audio" />
             </intent-filter>
         </activity>
+        <activity
+            android:name=".activities.LiveRoomActivity"
+            android:exported="false"
+            android:screenOrientation="portrait"
+            android:configChanges="orientation|screenSize|keyboardHidden" />
+        <activity
+            android:name=".activities.CinemaActivity"
+            android:configChanges="orientation|screenSize|keyboardHidden"
+            android:exported="false"
+            android:theme="@style/Theme.RetroMusic.FollowSystem" />
+        <activity
+            android:name=".activities.LivestreamActivity"
+            android:configChanges="orientation|screenSize|keyboardHidden"
+            android:exported="false"
+            android:theme="@style/Theme.RetroMusic.FollowSystem" />
+        <activity
+            android:name=".activities.CloudMusicActivity"
+            android:exported="false"
+            android:theme="@style/Theme.RetroMusic.FollowSystem" />
+
         <activity android:name=".activities.tageditor.AlbumTagEditorActivity" />
         <activity android:name=".activities.tageditor.SongTagEditorActivity" />
         <activity android:name=".activities.SupportDevelopmentActivity" />

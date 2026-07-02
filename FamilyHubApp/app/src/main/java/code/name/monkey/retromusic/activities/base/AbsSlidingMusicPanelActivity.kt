@@ -97,7 +97,6 @@ import code.name.monkey.retromusic.fragments.player.simple.SimplePlayerFragment
 import code.name.monkey.retromusic.fragments.player.tiny.TinyPlayerFragment
 import code.name.monkey.retromusic.fragments.queue.PlayingQueueFragment
 import code.name.monkey.retromusic.helper.MusicPlayerRemote
-import code.name.monkey.retromusic.model.CategoryInfo
 import code.name.monkey.retromusic.util.PreferenceUtil
 import code.name.monkey.retromusic.util.ViewUtil
 import code.name.monkey.retromusic.util.logD
@@ -463,20 +462,18 @@ abstract class AbsSlidingMusicPanelActivity : AbsMusicServiceActivity(),
 
     fun updateTabs() {
         binding.navigationView.menu.clear()
-        val currentTabs: List<CategoryInfo> = PreferenceUtil.libraryCategory
-        for (tab in currentTabs) {
-            if (tab.visible) {
-                val menu = tab.category
-                binding.navigationView.menu.add(0, menu.id, 0, menu.stringRes)
-                    .setIcon(menu.icon)
-            }
-        }
-        if (binding.navigationView.menu.size() == 1) {
-            isInOneTabMode = true
-            binding.navigationView.isVisible = false
-        } else {
-            isInOneTabMode = false
-        }
+        binding.navigationView.menu.add(0, R.id.action_familyhub_home, 0, R.string.familyhub_hub)
+            .setIcon(R.drawable.ic_dashboard)
+        binding.navigationView.menu.add(0, R.id.action_live, 1, R.string.familyhub_live)
+            .setIcon(R.drawable.ic_play_circle)
+        binding.navigationView.menu.add(0, R.id.action_cinema, 2, R.string.familyhub_cinema)
+            .setIcon(R.drawable.ic_open_in_browser)
+        binding.navigationView.menu.add(0, R.id.action_home, 3, R.string.familyhub_music)
+            .setIcon(R.drawable.ic_library_music)
+        binding.navigationView.menu.add(0, R.id.action_more, 4, R.string.familyhub_more)
+            .setIcon(R.drawable.ic_settings)
+        isInOneTabMode = false
+        binding.navigationView.isVisible = true
     }
 
     private fun updateColor() {

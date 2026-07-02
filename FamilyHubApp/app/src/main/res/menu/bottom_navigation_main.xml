@@ -2,30 +2,33 @@
 <menu xmlns:android="http://schemas.android.com/apk/res/android">
 
     <item
-        android:id="@+id/action_home"
+        android:id="@+id/action_familyhub_home"
         android:enabled="true"
-        android:icon="@drawable/ic_home"
-        android:title="@string/for_you" />
+        android:icon="@drawable/ic_dashboard"
+        android:title="@string/familyhub_hub" />
 
     <item
-        android:id="@+id/action_song"
+        android:id="@+id/action_live"
         android:enabled="true"
-        android:icon="@drawable/ic_audiotrack"
-        android:title="@string/songs" />
+        android:icon="@drawable/ic_play_circle"
+        android:title="@string/familyhub_live" />
+
     <item
-        android:id="@+id/action_album"
+        android:id="@+id/action_cinema"
         android:enabled="true"
-        android:icon="@drawable/ic_album"
-        android:title="@string/albums" />
+        android:icon="@drawable/ic_open_in_browser"
+        android:title="@string/familyhub_cinema" />
+
     <item
-        android:id="@+id/action_artist"
+        android:id="@+id/action_home"
         android:enabled="true"
-        android:icon="@drawable/ic_artist"
-        android:title="@string/artists" />
+        android:icon="@drawable/ic_library_music"
+        android:title="@string/familyhub_music" />
+
     <item
-        android:id="@+id/action_playlist"
+        android:id="@+id/action_more"
         android:enabled="true"
-        android:icon="@drawable/ic_queue_music"
-        android:title="@string/playlists" />
+        android:icon="@drawable/ic_settings"
+        android:title="@string/familyhub_more" />
 
 </menu>

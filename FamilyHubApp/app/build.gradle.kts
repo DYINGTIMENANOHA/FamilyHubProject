@@ -175,6 +175,8 @@ dependencies {
     implementation(libs.tankery.circularSeekBar)
 
     implementation(libs.androidx.exoplayer)
+
+    implementation(libs.livekit.android)
 }
 
 fun getProperties(fileName: String): Properties? {

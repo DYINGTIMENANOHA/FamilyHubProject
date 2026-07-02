@@ -1,4 +1,4 @@
-﻿# FamilyHub backend configuration example
+# FamilyHub backend configuration example
 # Copy this file to familyhub.config or export the variables from systemd/bash.
 
 FAMILYHUB_PUBLIC_BASE_URL=https://your-domain.example
@@ -11,7 +11,23 @@ FAMILYHUB_DEFAULT_MAX_DEVICES=2
 FAMILYHUB_LIVEKIT_URL=wss://your-domain.example/livekit
 FAMILYHUB_LIVEKIT_API_KEY=
 FAMILYHUB_LIVEKIT_API_SECRET=
+FAMILYHUB_LIVEKIT_TOKEN_TTL_SECONDS=3600
 
 # Legacy services are referenced, not modified, by FamilyHubBackend.
 FAMILYHUB_LEGACY_LIVESTREAM_BASE_URL=https://your-domain.example
 FAMILYHUB_LEGACY_CINEMA_BASE_URL=https://your-domain.example/cinema
+FAMILYHUB_LIVESTREAM_BASE_URL=https://your-domain.example/
+
+# Cinema integration opens the existing Cinema web app from inside FamilyHubApp.
+# If FAMILYHUB_CINEMA_BASE_URL is empty, it is derived from FAMILYHUB_PUBLIC_BASE_URL as /cinema/.
+FAMILYHUB_CINEMA_BASE_URL=https://your-domain.example/cinema/
+FAMILYHUB_AUTH_TOKENS_DB=/opt/auth/data/tokens.db
+FAMILYHUB_AUTH_KEYS_DIR=/opt/auth/keys
+# Optional fallback tokens. Prefer reading from the existing auth system instead of hardcoding.
+FAMILYHUB_CINEMA_WATCH_TOKEN=
+FAMILYHUB_CINEMA_ADMIN_TOKEN=
+FAMILYHUB_LIVESTREAM_WATCH_TOKEN=
+FAMILYHUB_LIVESTREAM_TEST_WATCH_TOKEN=
+# Comma-separated FamilyHub nicknames or user ids allowed to launch Cinema admin.
+FAMILYHUB_INTEGRATION_ADMINS=alice
+FAMILYHUB_INTEGRATION_LAUNCH_TTL_SECONDS=120
