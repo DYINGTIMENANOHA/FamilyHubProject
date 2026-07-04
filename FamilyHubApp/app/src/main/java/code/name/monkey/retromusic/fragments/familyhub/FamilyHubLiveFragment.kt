@@ -99,7 +99,8 @@ class FamilyHubLiveFragment : Fragment(R.layout.fragment_familyhub_live) {
             orientation = RadioGroup.VERTICAL
         }
         val qualityOptions = listOf(
-            "Ultra - best quality / high frame rate" to "ultra",
+            "Extreme - 1440p 120fps" to "extreme",
+            "Ultra - 1440p 60fps" to "ultra",
             "High - 1080p high quality" to "high",
             "HD - 720p high frame rate" to "hd",
             "Standard - balanced" to "standard",
@@ -113,6 +114,17 @@ class FamilyHubLiveFragment : Fragment(R.layout.fragment_familyhub_live) {
             }
         }
         qualityOptions.forEach { qualityGroup.addView(it) }
+        val extremeOption = qualityOptions.first { it.tag == "extreme" }
+        fun updateExtremeAvailability(isScreen: Boolean) {
+            extremeOption.visibility = if (isScreen) View.VISIBLE else View.GONE
+            if (!isScreen && extremeOption.isChecked) {
+                qualityOptions.first { it.tag == "ultra" }.isChecked = true
+            }
+        }
+        updateExtremeAvailability(false)
+        sourceGroup.setOnCheckedChangeListener { _, checkedId ->
+            updateExtremeAvailability(checkedId == screenOption.id)
+        }
         val content = LinearLayout(requireContext()).apply {
             orientation = LinearLayout.VERTICAL
             val padding = (20 * resources.displayMetrics.density).toInt()

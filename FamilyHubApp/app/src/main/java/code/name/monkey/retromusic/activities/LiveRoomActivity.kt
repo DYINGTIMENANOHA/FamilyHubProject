@@ -5,11 +5,14 @@ import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.media.AudioFormat
 import android.media.projection.MediaProjectionManager
 import android.os.Build
 import android.os.Bundle
 import android.util.Log
+import android.view.Gravity
 import android.view.View
+import android.widget.FrameLayout
 import android.widget.RadioButton
 import android.widget.RadioGroup
 import android.widget.TextView
@@ -34,6 +37,8 @@ import io.livekit.android.AudioOptions
 import io.livekit.android.AudioType
 import io.livekit.android.LiveKit
 import io.livekit.android.LiveKitOverrides
+import io.livekit.android.RoomOptions
+import io.livekit.android.audio.AudioBufferCallback
 import io.livekit.android.audio.ScreenAudioCapturer
 import io.livekit.android.events.RoomEvent
 import io.livekit.android.events.collect
@@ -58,13 +63,19 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import livekit.org.webrtc.RendererCommon
+import livekit.org.webrtc.RtpParameters
+import livekit.org.webrtc.VideoSink
 import livekit.org.webrtc.audio.JavaAudioDeviceModule
 import org.koin.android.ext.android.inject
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
+import kotlin.math.min
 
 private data class LiveQualityProfile(
     val label: String,
-    // For screen capture: width is the long side, height the short side; the SDK swaps
-    // them automatically to follow the display orientation.
+    // For screen capture these are a pixel budget: the short side caps the capture size
+    // while the long side follows the device's real aspect ratio (see
+    // screenCaptureParameter); the SDK swaps them to follow the display orientation.
     val width: Int,
     val height: Int,
     val fps: Int,
@@ -75,15 +86,17 @@ private data class LiveQualityProfile(
             val normalized = if (quality == "original") "high" else quality
             return if (sourceType == "screen") {
                 when (normalized) {
-                    "ultra" -> LiveQualityProfile("Screen Ultra 1440p30", 2560, 1440, 30, 10_000_000)
+                    "extreme" -> LiveQualityProfile("Screen Extreme 1440p120", 2560, 1440, 120, 16_000_000)
+                    "ultra" -> LiveQualityProfile("Screen Ultra 1440p60", 2560, 1440, 60, 12_000_000)
                     "high" -> LiveQualityProfile("Screen High 1080p60", 1920, 1080, 60, 8_000_000)
                     "hd" -> LiveQualityProfile("Screen HD 1080p30", 1920, 1080, 30, 5_000_000)
                     "standard" -> LiveQualityProfile("Screen Standard 720p30", 1280, 720, 30, 2_500_000)
                     "smooth" -> LiveQualityProfile("Screen Smooth 720p15", 1280, 720, 15, 1_500_000)
-                    else -> LiveQualityProfile("Screen Ultra 1440p30", 2560, 1440, 30, 10_000_000)
+                    else -> LiveQualityProfile("Screen Ultra 1440p60", 2560, 1440, 60, 12_000_000)
                 }
             } else {
                 when (normalized) {
+                    "extreme" -> LiveQualityProfile("Camera Ultra 1080p60", 1920, 1080, 60, 8_000_000)
                     "ultra" -> LiveQualityProfile("Camera Ultra 1080p60", 1920, 1080, 60, 8_000_000)
                     "high" -> LiveQualityProfile("Camera High 1080p30", 1920, 1080, 30, 5_000_000)
                     "hd" -> LiveQualityProfile("Camera HD 720p60", 1280, 720, 60, 4_000_000)
@@ -96,7 +109,41 @@ private data class LiveQualityProfile(
     }
 }
 
+/**
+ * Wraps the screen-audio mixer so the microphone level can be adjusted independently of
+ * the shared system sound: the incoming buffer is raw mic PCM, which gets scaled by
+ * [micGain] before the delegate mixes the captured screen audio into it.
+ */
+private class MicGainAudioMixer(
+    private val delegate: AudioBufferCallback?,
+) : AudioBufferCallback {
+    @Volatile
+    var micGain: Float = 1f
+
+    override fun onBuffer(
+        buffer: ByteBuffer,
+        audioFormat: Int,
+        channelCount: Int,
+        sampleRate: Int,
+        bytesRead: Int,
+        captureTimeNs: Long,
+    ): Long {
+        val gain = micGain
+        if (gain < 0.999f && audioFormat == AudioFormat.ENCODING_PCM_16BIT && bytesRead >= 2) {
+            val samples = buffer.duplicate().order(ByteOrder.nativeOrder()).asShortBuffer()
+            val count = min(samples.limit(), bytesRead / 2)
+            for (i in 0 until count) {
+                val scaled = (samples.get(i) * gain).toInt().coerceIn(-32768, 32767)
+                samples.put(i, scaled.toShort())
+            }
+        }
+        return delegate?.onBuffer(buffer, audioFormat, channelCount, sampleRate, bytesRead, captureTimeNs)
+            ?: captureTimeNs
+    }
+}
+
 private val liveQualityOptions = listOf(
+    "extreme" to "Extreme",
     "ultra" to "Ultra",
     "high" to "High",
     "hd" to "HD",
@@ -148,6 +195,8 @@ class LiveRoomActivity : AppCompatActivity() {
     private lateinit var bottomControls: View
     private lateinit var hostControls: View
     private lateinit var hostAudioControls: View
+    private lateinit var micAudioLabel: TextView
+    private lateinit var micAudioSlider: Slider
     private lateinit var shareAudioLabel: TextView
     private lateinit var shareAudioSlider: Slider
     private lateinit var btnMic: MaterialButton
@@ -156,6 +205,7 @@ class LiveRoomActivity : AppCompatActivity() {
     private lateinit var btnQuality: MaterialButton
     private lateinit var btnFlip: MaterialButton
     private lateinit var btnRemoteAudio: MaterialButton
+    private lateinit var btnScaleMode: MaterialButton
     private lateinit var btnEnd: MaterialButton
 
     private var isHost = false
@@ -163,18 +213,52 @@ class LiveRoomActivity : AppCompatActivity() {
     private var sourceType = "camera"
     private var quality = "ultra"
     private var micEnabled = true
+    private var micVolume = 1f
     private var systemAudioEnabled = true
     private var systemAudioVolume = 1f
     private var remoteAudioMuted = false
+    private var fillScreen = false
     private var viewerChromeVisible = true
     private var videoEnabled = true
     private var localVideoTrack: LocalVideoTrack? = null
     private var remoteAudioTrack: RemoteAudioTrack? = null
+    private var remoteVideoTrack: RemoteVideoTrack? = null
     private var heartbeatJob: Job? = null
     private var roomStatusJob: Job? = null
     private var screenAudioCapturer: ScreenAudioCapturer? = null
+    private var micGainMixer: MicGainAudioMixer? = null
     private var shareOverlay: LiveShareOverlay? = null
     private var overlayPermissionAsked = false
+    private var lastRemoteShortSide = 0
+    private var remoteFrameWidth = 0
+    private var remoteFrameHeight = 0
+    private var appliedVideoAspect = 0f
+
+    // Watches decoded frames so viewers get told when simulcast temporarily lowers the
+    // resolution below what the host is nominally streaming, and so the fit/fill layout
+    // can follow the video's aspect ratio.
+    private val remoteResolutionSink = VideoSink { frame ->
+        val width = frame.rotatedWidth
+        val height = frame.rotatedHeight
+        val shortSide = min(width, height)
+        if (shortSide > 0 && (width != remoteFrameWidth || height != remoteFrameHeight)) {
+            remoteFrameWidth = width
+            remoteFrameHeight = height
+            lastRemoteShortSide = shortSide
+            runOnUiThread {
+                updateViewerResolutionStatus(shortSide)
+                // Only re-layout when the aspect ratio genuinely changes (orientation or
+                // source change); simulcast layer switches keep the aspect and must never
+                // trigger layout churn.
+                val aspect = width.toFloat() / height
+                if (appliedVideoAspect <= 0f ||
+                    kotlin.math.abs(aspect - appliedVideoAspect) / appliedVideoAspect > 0.02f
+                ) {
+                    applyViewerLayout()
+                }
+            }
+        }
+    }
 
     private val permissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -221,6 +305,8 @@ class LiveRoomActivity : AppCompatActivity() {
         bottomControls = findViewById(R.id.live_bottom_controls)
         hostControls = findViewById(R.id.live_host_controls)
         hostAudioControls = findViewById(R.id.live_host_audio_controls)
+        micAudioLabel = findViewById(R.id.mic_audio_label)
+        micAudioSlider = findViewById(R.id.mic_audio_slider)
         shareAudioLabel = findViewById(R.id.share_audio_label)
         shareAudioSlider = findViewById(R.id.share_audio_slider)
         btnMic = findViewById(R.id.btn_mic)
@@ -229,6 +315,7 @@ class LiveRoomActivity : AppCompatActivity() {
         btnQuality = findViewById(R.id.btn_quality)
         btnFlip = findViewById(R.id.btn_flip_cam)
         btnRemoteAudio = findViewById(R.id.btn_remote_audio)
+        btnScaleMode = findViewById(R.id.btn_scale_mode)
         btnEnd = findViewById(R.id.btn_end)
 
         titleText.text = intent.getStringExtra(EXTRA_TITLE) ?: "Live"
@@ -250,8 +337,10 @@ class LiveRoomActivity : AppCompatActivity() {
             View.GONE
         }
         btnRemoteAudio.visibility = if (isHost) View.GONE else View.VISIBLE
+        btnScaleMode.visibility = if (isHost) View.GONE else View.VISIBLE
         btnCam.text = if (sourceType == "screen") "Stop Share" else "Cam Off"
         btnMic.text = if (micEnabled) "Mic On" else "Mic Off"
+        updateMicAudioUi()
         updateSystemAudioUi()
         updateRemoteAudioButtonText()
         updateQualityButtonText()
@@ -263,7 +352,16 @@ class LiveRoomActivity : AppCompatActivity() {
         } else {
             LiveKitOverrides(audioOptions = AudioOptions(audioOutputType = AudioType.MediaAudioType()))
         }
-        room = LiveKit.create(applicationContext, overrides = overrides)
+        // adaptiveStream is deliberately OFF: it ties received quality to the renderer's
+        // view size, which fights the viewer fit/fill layout (feedback loop) and made
+        // shrinking the view genuinely lower the stream quality. Weak-network downgrades
+        // still work via simulcast + the server's bandwidth estimation. dynacast stops
+        // encoding simulcast layers nobody is subscribed to.
+        room = LiveKit.create(
+            applicationContext,
+            options = RoomOptions(dynacast = true),
+            overrides = overrides,
+        )
         room.initVideoRenderer(remoteVideoView)
         room.initVideoRenderer(localPreviewView)
         // Letterbox instead of cropping so landscape streams are fully visible on a portrait
@@ -278,6 +376,7 @@ class LiveRoomActivity : AppCompatActivity() {
         btnQuality.setOnClickListener { showQualityDialog() }
         btnFlip.setOnClickListener { flipCam() }
         btnRemoteAudio.setOnClickListener { toggleRemoteAudio() }
+        btnScaleMode.setOnClickListener { toggleScaleMode() }
         btnEnd.setOnClickListener { endAndLeave() }
         shareAudioSlider.addOnChangeListener { _, value, fromUser ->
             if (fromUser) {
@@ -288,7 +387,28 @@ class LiveRoomActivity : AppCompatActivity() {
                 shareOverlay?.updateState(micEnabled, systemAudioEnabled)
             }
         }
+        micAudioSlider.addOnChangeListener { _, value, fromUser ->
+            if (fromUser) {
+                micVolume = value / 100f
+                micEnabled = micVolume > 0f
+                applyMicMuteState()
+                applyMicGain()
+                btnMic.text = if (micEnabled) "Mic On" else "Mic Off"
+                updateMicAudioUi(syncSlider = false)
+                shareOverlay?.updateState(micEnabled, systemAudioEnabled)
+            }
+        }
         if (!isHost) {
+            // The tap-to-toggle gesture lives on the parent so the letterbox area around a
+            // fitted video stays tappable too.
+            (remoteVideoView.parent as? View)?.let { parent ->
+                parent.setOnClickListener { toggleViewerChrome() }
+                parent.addOnLayoutChangeListener { _, l, t, r, b, ol, ot, orr, ob ->
+                    if (r - l != orr - ol || b - t != ob - ot) {
+                        remoteVideoView.post { applyViewerLayout() }
+                    }
+                }
+            }
             remoteVideoView.setOnClickListener { toggleViewerChrome() }
         }
 
@@ -366,6 +486,17 @@ class LiveRoomActivity : AppCompatActivity() {
         ) {
             showShareOverlay()
         }
+        // The renderer surface is destroyed while backgrounded; re-attach the remote track
+        // so playback resumes instead of staying black.
+        if (!isHost) {
+            remoteVideoTrack?.let { track ->
+                track.removeRenderer(remoteVideoView)
+                remoteVideoView.post {
+                    if (isDestroyed || track != remoteVideoTrack) return@post
+                    track.addRenderer(remoteVideoView)
+                }
+            }
+        }
     }
 
     @ChecksSdkIntAtLeast(api = Build.VERSION_CODES.Q)
@@ -400,12 +531,17 @@ class LiveRoomActivity : AppCompatActivity() {
                         statusText.text = "Disconnected"
                         finish()
                     }
+                    is RoomEvent.Reconnecting -> {
+                        statusText.text = "Reconnecting..."
+                    }
+                    is RoomEvent.Reconnected -> {
+                        statusText.text = if (isHost) "Live" else "Watching"
+                    }
                     is RoomEvent.TrackSubscribed -> {
                         val track = event.track
                         if (track is RemoteVideoTrack) {
                             if (!isHost) {
-                                remoteVideoView.visibility = View.VISIBLE
-                                track.addRenderer(remoteVideoView)
+                                attachRemoteVideo(track)
                             }
                         } else if (track is RemoteAudioTrack && !isHost) {
                             remoteAudioTrack = track
@@ -421,8 +557,7 @@ class LiveRoomActivity : AppCompatActivity() {
                     is RoomEvent.TrackUnsubscribed -> {
                         val track = event.track
                         if (track is RemoteVideoTrack) {
-                            track.removeRenderer(remoteVideoView)
-                            remoteVideoView.visibility = View.INVISIBLE
+                            detachRemoteVideo(track)
                         } else if (track is RemoteAudioTrack && track == remoteAudioTrack) {
                             remoteAudioTrack = null
                         }
@@ -435,6 +570,50 @@ class LiveRoomActivity : AppCompatActivity() {
         lifecycleScope.launch {
             runCatching { room.connect(url, token) }
                 .onFailure { statusText.text = "Connection failed: ${it.message}" }
+        }
+    }
+
+    private fun attachRemoteVideo(track: RemoteVideoTrack) {
+        remoteVideoTrack?.let { previous ->
+            previous.removeRenderer(remoteVideoView)
+            previous.removeRenderer(remoteResolutionSink)
+        }
+        remoteVideoTrack = track
+        lastRemoteShortSide = 0
+        remoteFrameWidth = 0
+        remoteFrameHeight = 0
+        appliedVideoAspect = 0f
+        remoteVideoView.visibility = View.VISIBLE
+        remoteVideoView.post {
+            if (isDestroyed || track != remoteVideoTrack) return@post
+            track.addRenderer(remoteVideoView)
+            track.addRenderer(remoteResolutionSink)
+        }
+        statusText.text = "Watching"
+    }
+
+    private fun detachRemoteVideo(track: RemoteVideoTrack) {
+        track.removeRenderer(remoteVideoView)
+        track.removeRenderer(remoteResolutionSink)
+        if (track == remoteVideoTrack) {
+            remoteVideoTrack = null
+        }
+        remoteVideoView.visibility = View.INVISIBLE
+        if (!isHost) {
+            // Track drops mid-stream when the host restarts the share (e.g. a quality
+            // change); the room-status poller will finish() if the live actually ended.
+            statusText.text = "Host is adjusting the stream..."
+        }
+    }
+
+    private fun updateViewerResolutionStatus(shortSide: Int) {
+        if (isHost || remoteVideoTrack == null) return
+        val profile = LiveQualityProfile.forRoom(sourceType, quality)
+        val expectedShortSide = min(profile.width, profile.height)
+        statusText.text = if (shortSide < (expectedShortSide * 3) / 4) {
+            "Weak network - ${shortSide}p"
+        } else {
+            "Watching ${shortSide}p"
         }
     }
 
@@ -464,19 +643,49 @@ class LiveRoomActivity : AppCompatActivity() {
         statusText.text = "Live"
     }
 
+    /**
+     * Screen capture must match the device's real aspect ratio: mirroring a 20:9 screen
+     * into a fixed 16:9 virtual display crops the edges. The quality profile only sets
+     * the pixel budget (short side); the long side follows the actual screen.
+     */
+    private fun screenCaptureParameter(profile: LiveQualityProfile): VideoCaptureParameter {
+        val bounds = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            windowManager.currentWindowMetrics.bounds.let { it.width() to it.height() }
+        } else {
+            val point = android.graphics.Point()
+            @Suppress("DEPRECATION")
+            windowManager.defaultDisplay.getRealSize(point)
+            point.x to point.y
+        }
+        val deviceLong = maxOf(bounds.first, bounds.second)
+        val deviceShort = minOf(bounds.first, bounds.second)
+        if (deviceLong <= 0 || deviceShort <= 0) {
+            return VideoCaptureParameter(profile.width, profile.height, profile.fps)
+        }
+        val targetShort = minOf(profile.width, profile.height, deviceShort)
+        val targetLong = (deviceLong.toLong() * targetShort / deviceShort).toInt()
+        // Encoders want even dimensions.
+        val width = targetLong and 1.inv()
+        val height = targetShort and 1.inv()
+        Log.i(TAG, "screenCaptureParameter: screen=${deviceLong}x$deviceShort capture=${width}x$height@${profile.fps}")
+        return VideoCaptureParameter(width, height, profile.fps)
+    }
+
     private fun applyLiveQuality() {
         val profile = LiveQualityProfile.forRoom(sourceType, quality)
         val captureOptions = LocalVideoTrackOptions(
             isScreencast = sourceType == "screen",
-            captureParams = VideoCaptureParameter(
-                profile.width,
-                profile.height,
-                profile.fps,
-            ),
+            captureParams = if (sourceType == "screen") {
+                screenCaptureParameter(profile)
+            } else {
+                VideoCaptureParameter(profile.width, profile.height, profile.fps)
+            },
         )
+        // Simulcast publishes extra lower-resolution layers so the server can step a viewer
+        // down (and back up) during network dips instead of letting the stream freeze.
         val publishOptions = VideoTrackPublishDefaults(
             videoEncoding = VideoEncoding(profile.bitrate, profile.fps),
-            simulcast = false,
+            simulcast = true,
         )
         if (sourceType == "screen") {
             room.screenShareTrackCaptureDefaults = captureOptions
@@ -484,6 +693,7 @@ class LiveRoomActivity : AppCompatActivity() {
             // Screen-share audio carries app/system sound (music, video, games): turn off the
             // voice-call processing chain that mangles non-speech audio, raise the Opus
             // bitrate, and keep encoding continuous (DTX gates quiet passages of music).
+            // RED adds redundant packets so brief packet loss doesn't drop the audio.
             room.audioTrackCaptureDefaults = LocalAudioTrackOptions(
                 noiseSuppression = false,
                 echoCancellation = false,
@@ -494,10 +704,15 @@ class LiveRoomActivity : AppCompatActivity() {
             room.audioTrackPublishDefaults = AudioTrackPublishDefaults(
                 audioBitrate = AudioPresets.MUSIC_HIGH_QUALITY_STEREO.maxBitrate,
                 dtx = false,
+                red = true,
             )
         } else {
             room.videoTrackCaptureDefaults = captureOptions
-            room.videoTrackPublishDefaults = publishOptions
+            // Under congestion prefer a softer picture over a choppy one.
+            room.videoTrackPublishDefaults = publishOptions.copy(
+                degradationPreference = RtpParameters.DegradationPreference.MAINTAIN_FRAMERATE,
+            )
+            room.audioTrackPublishDefaults = AudioTrackPublishDefaults(red = true)
         }
         statusText.text = profile.label
         Log.i(TAG, "applyLiveQuality: source=$sourceType quality=$quality profile=$profile")
@@ -575,8 +790,10 @@ class LiveRoomActivity : AppCompatActivity() {
             return
         }
         capturer.gain = currentSystemAudioGain()
-        audioTrack.setAudioBufferCallback(capturer)
+        val mixer = MicGainAudioMixer(capturer).also { it.micGain = micVolume }
+        audioTrack.setAudioBufferCallback(mixer)
         screenAudioCapturer = capturer
+        micGainMixer = mixer
         Log.i(TAG, "attachSystemAudio: system audio capture attached")
     }
 
@@ -601,6 +818,7 @@ class LiveRoomActivity : AppCompatActivity() {
         if (!systemAudioSupported()) return
         val capturer = screenAudioCapturer ?: return
         screenAudioCapturer = null
+        micGainMixer = null
         runCatching {
             (room.localParticipant.getTrackPublication(Track.Source.MICROPHONE)?.track as? LocalAudioTrack)
                 ?.setAudioBufferCallback(null)
@@ -610,6 +828,10 @@ class LiveRoomActivity : AppCompatActivity() {
 
     private fun toggleMic() {
         micEnabled = !micEnabled
+        if (micEnabled && micVolume <= 0f) {
+            micVolume = 1f
+            applyMicGain()
+        }
         if (sourceType == "screen") {
             // Don't mute the track itself: it carries system audio too. Mute only the
             // microphone input; the mix callback keeps running with silent mic data.
@@ -618,7 +840,20 @@ class LiveRoomActivity : AppCompatActivity() {
             lifecycleScope.launch { room.localParticipant.setMicrophoneEnabled(micEnabled) }
         }
         btnMic.text = if (micEnabled) "Mic On" else "Mic Off"
+        updateMicAudioUi()
         shareOverlay?.updateState(micEnabled, systemAudioEnabled)
+    }
+
+    private fun applyMicGain() {
+        micGainMixer?.micGain = micVolume
+    }
+
+    private fun updateMicAudioUi(syncSlider: Boolean = true) {
+        val percent = if (micEnabled) (micVolume * 100).toInt() else 0
+        micAudioLabel.text = "Mic $percent%"
+        if (syncSlider && micAudioSlider.value.toInt() != (micVolume * 100).toInt()) {
+            micAudioSlider.value = micVolume * 100
+        }
     }
 
     private fun applyMicMuteState() {
@@ -654,6 +889,51 @@ class LiveRoomActivity : AppCompatActivity() {
         if (syncSlider && shareAudioSlider.value.toInt() != (systemAudioVolume * 100).toInt()) {
             shareAudioSlider.value = systemAudioVolume * 100
         }
+    }
+
+    private fun toggleScaleMode() {
+        fillScreen = !fillScreen
+        applyViewerLayout()
+        updateScaleModeButtonText()
+    }
+
+    /**
+     * setScalingType is ignored while the renderer is match_parent (EXACTLY measure spec),
+     * so fit/fill is done by sizing the view itself: fit letterboxes by shrinking the view
+     * to the video's aspect ratio, fill keeps it fullscreen and lets the renderer crop.
+     */
+    private fun applyViewerLayout() {
+        if (isHost) return
+        val parent = remoteVideoView.parent as? View ?: return
+        val params = remoteVideoView.layoutParams as? FrameLayout.LayoutParams ?: return
+        if (fillScreen || remoteFrameWidth <= 0 || remoteFrameHeight <= 0 ||
+            parent.width <= 0 || parent.height <= 0
+        ) {
+            params.width = FrameLayout.LayoutParams.MATCH_PARENT
+            params.height = FrameLayout.LayoutParams.MATCH_PARENT
+        } else {
+            val videoAspect = remoteFrameWidth.toFloat() / remoteFrameHeight
+            val parentAspect = parent.width.toFloat() / parent.height
+            if (videoAspect > parentAspect) {
+                params.width = parent.width
+                params.height = (parent.width / videoAspect).toInt()
+            } else {
+                params.width = (parent.height * videoAspect).toInt()
+                params.height = parent.height
+            }
+            appliedVideoAspect = videoAspect
+        }
+        params.gravity = Gravity.CENTER
+        Log.i(
+            TAG,
+            "applyViewerLayout: fill=$fillScreen frame=${remoteFrameWidth}x$remoteFrameHeight " +
+                "parent=${parent.width}x${parent.height} -> ${params.width}x${params.height}",
+        )
+        remoteVideoView.layoutParams = params
+    }
+
+    private fun updateScaleModeButtonText() {
+        btnScaleMode.text = if (fillScreen) "Fill Screen" else "Fit Screen"
     }
 
     private fun toggleRemoteAudio() {
@@ -706,7 +986,12 @@ class LiveRoomActivity : AppCompatActivity() {
             orientation = RadioGroup.VERTICAL
             setPadding(32, 16, 32, 0)
         }
-        liveQualityOptions.forEach { (key, label) ->
+        val availableQualityOptions = if (sourceType == "screen") {
+            liveQualityOptions
+        } else {
+            liveQualityOptions.filterNot { (key, _) -> key == "extreme" }
+        }
+        availableQualityOptions.forEach { (key, label) ->
             val profile = LiveQualityProfile.forRoom(sourceType, key)
             val option = RadioButton(this).apply {
                 text = "$label - ${profile.label.substringAfter(' ')}"
@@ -764,6 +1049,23 @@ class LiveRoomActivity : AppCompatActivity() {
             runCatching { room.localParticipant.setScreenShareEnabled(false) }
             requestScreenShare()
         } else {
+            // Restart the capturer in place: the published track survives, so viewers keep
+            // watching without the unsubscribe/black-screen gap a full republish causes.
+            val track = room.localParticipant.getTrackPublication(Track.Source.CAMERA)?.track as? LocalVideoTrack
+            val profile = LiveQualityProfile.forRoom(sourceType, quality)
+            val restarted = track != null && runCatching {
+                track.restartTrack(
+                    track.options.copy(
+                        captureParams = VideoCaptureParameter(profile.width, profile.height, profile.fps),
+                    ),
+                )
+            }.onFailure { Log.w(TAG, "restartVideoForQuality: restartTrack failed, republishing", it) }
+                .isSuccess
+            if (restarted) {
+                attachLocalPreview(track!!)
+                statusText.text = "Live"
+                return
+            }
             runCatching {
                 room.localParticipant.setCameraEnabled(false)
                 delay(300)
@@ -851,6 +1153,11 @@ class LiveRoomActivity : AppCompatActivity() {
                 }
                 if (latestRoom?.quality != null && latestRoom.quality != quality) {
                     quality = latestRoom.quality
+                    // Re-evaluate the resolution notice against the new nominal quality on
+                    // the next decoded frame.
+                    lastRemoteShortSide = 0
+                    remoteFrameWidth = 0
+                    remoteFrameHeight = 0
                     statusText.text = "Watching"
                 }
             }
@@ -886,6 +1193,9 @@ class LiveRoomActivity : AppCompatActivity() {
         room.disconnect()
         localVideoTrack?.removeRenderer(localPreviewView)
         localVideoTrack?.removeRenderer(remoteVideoView)
+        remoteVideoTrack?.removeRenderer(remoteVideoView)
+        remoteVideoTrack?.removeRenderer(remoteResolutionSink)
+        remoteVideoTrack = null
         if (::remoteVideoView.isInitialized) remoteVideoView.release()
         if (::localPreviewView.isInitialized) localPreviewView.release()
     }
