@@ -468,10 +468,10 @@ abstract class AbsSlidingMusicPanelActivity : AbsMusicServiceActivity(),
             .setIcon(R.drawable.ic_play_circle)
         binding.navigationView.menu.add(0, R.id.action_cinema, 2, R.string.familyhub_cinema)
             .setIcon(R.drawable.ic_open_in_browser)
-        binding.navigationView.menu.add(0, R.id.action_home, 3, R.string.familyhub_music)
+        binding.navigationView.menu.add(0, R.id.action_familyhub_music, 3, R.string.familyhub_music)
             .setIcon(R.drawable.ic_library_music)
-        binding.navigationView.menu.add(0, R.id.action_more, 4, R.string.familyhub_more)
-            .setIcon(R.drawable.ic_settings)
+        binding.navigationView.menu.add(0, R.id.action_more, 4, R.string.familyhub_stream)
+            .setIcon(R.drawable.ic_play_circle_filled)
         isInOneTabMode = false
         binding.navigationView.isVisible = true
     }

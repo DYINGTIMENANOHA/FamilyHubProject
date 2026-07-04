@@ -22,9 +22,15 @@
         tools:layout="@layout/fragment_familyhub_feature" />
 
     <fragment
+        android:id="@+id/action_familyhub_music"
+        android:name="code.name.monkey.retromusic.fragments.familyhub.FamilyHubMusicFragment"
+        android:label="Music"
+        tools:layout="@layout/fragment_familyhub_music" />
+
+    <fragment
         android:id="@+id/action_more"
         android:name="code.name.monkey.retromusic.fragments.familyhub.FamilyHubMoreFragment"
-        android:label="More"
+        android:label="Stream"
         tools:layout="@layout/fragment_familyhub_feature" />
 
     <fragment

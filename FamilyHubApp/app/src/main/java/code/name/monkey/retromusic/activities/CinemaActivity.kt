@@ -8,10 +8,8 @@ import android.content.pm.ActivityInfo
 import android.graphics.Color
 import android.os.Bundle
 import android.util.Log
-import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
-import android.view.ViewConfiguration
 import android.view.WindowManager
 import android.webkit.CookieManager
 import android.webkit.JavascriptInterface
@@ -144,6 +142,25 @@ class CinemaActivity : AppCompatActivity() {
                   padding-bottom: 4px !important;
                   touch-action: pan-x !important;
                 }
+                .progress-slider,
+                .volume-slider {
+                  touch-action: none !important;
+                }
+                .progress-row {
+                  padding: 10px 0 !important;
+                }
+                .video-picker-body {
+                  overflow-y: auto !important;
+                  -webkit-overflow-scrolling: touch !important;
+                  touch-action: pan-y !important;
+                  overscroll-behavior: contain !important;
+                }
+                .sidebar-body,
+                .chat-sidebar #chat-body {
+                  -webkit-overflow-scrolling: touch !important;
+                  touch-action: pan-y !important;
+                  overscroll-behavior: contain !important;
+                }
                 .ctrl-btn {
                   flex: 0 0 auto !important;
                   min-width: 40px !important;
@@ -243,8 +260,6 @@ class CinemaActivity : AppCompatActivity() {
     private var customViewCallback: WebChromeClient.CustomViewCallback? = null
     private var previousSystemUiVisibility: Int = 0
     private var previousOrientation: Int = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
-    private var lastTouchY: Float = 0f
-    private var isManualScrollGesture = false
     private val adminMode: Boolean by lazy { intent.getBooleanExtra(EXTRA_ADMIN, false) }
 
     @SuppressLint("SetJavaScriptEnabled")
@@ -277,35 +292,8 @@ class CinemaActivity : AppCompatActivity() {
         webView.isHorizontalScrollBarEnabled = false
         webView.setBackgroundColor(Color.BLACK)
         webView.addJavascriptInterface(CinemaJavascriptBridge(), "FamilyHubCinema")
-        val touchSlop = ViewConfiguration.get(this).scaledTouchSlop
-        webView.setOnTouchListener { touchedView, event ->
-            when (event.actionMasked) {
-                MotionEvent.ACTION_DOWN -> {
-                    lastTouchY = event.y
-                    isManualScrollGesture = false
-                    touchedView.parent?.requestDisallowInterceptTouchEvent(true)
-                    false
-                }
-                MotionEvent.ACTION_MOVE -> {
-                    val dy = lastTouchY - event.y
-                    lastTouchY = event.y
-                    if (isManualScrollGesture || kotlin.math.abs(dy) > touchSlop) {
-                        isManualScrollGesture = true
-                        webView.scrollBy(0, dy.toInt())
-                        true
-                    } else {
-                        false
-                    }
-                }
-                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
-                    touchedView.parent?.requestDisallowInterceptTouchEvent(false)
-                    val consumed = isManualScrollGesture
-                    isManualScrollGesture = false
-                    consumed
-                }
-                else -> false
-            }
-        }
+        // No custom touch handler here: WebView's native handling is required for nested
+        // scrollables (video picker list, chat sidebar) and slider drags to receive events.
 
         CookieManager.getInstance().setAcceptCookie(true)
         CookieManager.getInstance().setAcceptThirdPartyCookies(webView, true)

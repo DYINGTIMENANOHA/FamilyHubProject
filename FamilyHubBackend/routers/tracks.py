@@ -6,17 +6,31 @@ from pathlib import Path
 import aiofiles
 from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile, File
 from fastapi.responses import StreamingResponse
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from config import UPLOADS_DIR
 from auth import get_current_user
 from database import get_db
-from models import Track, User
+from models import Track, TrackPlay, User
 
 router = APIRouter()
 
 ALLOWED_EXTENSIONS = {".mp3", ".flac", ".wav", ".m4a", ".ogg", ".aac"}
 CHUNK_SIZE = 64 * 1024  # 64 KB
+HISTORY_LIMIT = 50
+
+
+def _track_dict(t: Track) -> dict:
+    return {
+        "id": t.id,
+        "title": t.title,
+        "artist": t.artist,
+        "duration_ms": t.duration_ms,
+        "source": t.source,
+        "play_count": t.play_count,
+        "created_at": t.created_at.isoformat() if t.created_at else None,
+    }
 
 
 def _extract_metadata(file_path: Path, original_filename: str):
@@ -69,28 +83,42 @@ async def upload_track(
     db.commit()
     db.refresh(track)
 
-    return {
-        "id": track.id,
-        "title": track.title,
-        "artist": track.artist,
-        "duration_ms": track.duration_ms,
-    }
+    return _track_dict(track)
 
 
 @router.get("/tracks")
-def get_tracks(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    tracks = db.query(Track).order_by(Track.created_at.desc()).all()
-    return [
-        {
-            "id": t.id,
-            "title": t.title,
-            "artist": t.artist,
-            "duration_ms": t.duration_ms,
-            "source": t.source,
-            "created_at": t.created_at.isoformat() if t.created_at else None,
-        }
-        for t in tracks
-    ]
+def get_tracks(
+    sort: str = "recent",
+    limit: int | None = None,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    query = db.query(Track)
+    if sort == "most_played":
+        query = query.order_by(Track.play_count.desc(), Track.created_at.desc())
+    else:
+        query = query.order_by(Track.created_at.desc())
+    if limit:
+        query = query.limit(limit)
+    return [_track_dict(t) for t in query.all()]
+
+
+@router.get("/tracks/history")
+def get_track_history(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    last_played = (
+        db.query(TrackPlay.track_id, func.max(TrackPlay.played_at).label("last_played_at"))
+        .filter(TrackPlay.user_id == user.id)
+        .group_by(TrackPlay.track_id)
+        .subquery()
+    )
+    rows = (
+        db.query(Track)
+        .join(last_played, Track.id == last_played.c.track_id)
+        .order_by(last_played.c.last_played_at.desc())
+        .limit(HISTORY_LIMIT)
+        .all()
+    )
+    return [_track_dict(t) for t in rows]
 
 
 @router.get("/tracks/{track_id}")
@@ -102,14 +130,23 @@ def get_track(
     track = db.query(Track).filter(Track.id == track_id).first()
     if not track:
         raise HTTPException(status_code=404, detail="Track not found")
-    return {
-        "id": track.id,
-        "title": track.title,
-        "artist": track.artist,
-        "duration_ms": track.duration_ms,
-        "source": track.source,
-        "created_at": track.created_at.isoformat() if track.created_at else None,
-    }
+    return _track_dict(track)
+
+
+@router.post("/tracks/{track_id}/play")
+def report_track_play(
+    track_id: str,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    track = db.query(Track).filter(Track.id == track_id).first()
+    if not track:
+        raise HTTPException(status_code=404, detail="Track not found")
+    track.play_count += 1
+    db.add(TrackPlay(track_id=track.id, user_id=user.id))
+    db.commit()
+    db.refresh(track)
+    return {"id": track.id, "play_count": track.play_count}
 
 
 @router.get("/stream/{track_id}")

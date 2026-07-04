@@ -17,16 +17,15 @@ package code.name.monkey.retromusic.lyrics;
 import android.text.TextUtils;
 import android.text.format.DateUtils;
 
-import java.io.BufferedReader;
+import code.name.monkey.retromusic.util.LyricUtil;
+
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -72,23 +71,31 @@ class LrcUtils {
 
     List<LrcEntry> entryList = new ArrayList<>();
     try {
-      BufferedReader br =
-          new BufferedReader(
-              new InputStreamReader(new FileInputStream(lrcFile), StandardCharsets.UTF_8));
-      String line;
-      while ((line = br.readLine()) != null) {
+      String text = LyricUtil.decodeLyrics(readAllBytes(lrcFile));
+      for (String line : text.split("\\r?\\n")) {
         List<LrcEntry> list = parseLine(line);
         if (list != null && !list.isEmpty()) {
           entryList.addAll(list);
         }
       }
-      br.close();
     } catch (IOException e) {
       e.printStackTrace();
     }
 
     Collections.sort(entryList);
     return entryList;
+  }
+
+  private static byte[] readAllBytes(File file) throws IOException {
+    try (InputStream is = new FileInputStream(file);
+        ByteArrayOutputStream bos = new ByteArrayOutputStream()) {
+      byte[] buffer = new byte[8192];
+      int len;
+      while ((len = is.read(buffer)) != -1) {
+        bos.write(buffer, 0, len);
+      }
+      return bos.toByteArray();
+    }
   }
 
   /** 从文本解析双语歌词 */

@@ -608,4 +608,20 @@
     <string name="familyhub_cloud_music_now_playing">Playing %1$s</string>
     <string name="familyhub_cloud_music_play_failed">Could not play this cloud track.</string>
     <string name="familyhub_cloud_music_track">Cloud track</string>
+    <string name="familyhub_cloud_all_songs">All Songs</string>
+    <string name="familyhub_cloud_last_added">Last Added</string>
+    <string name="familyhub_cloud_most_played">Most Played</string>
+    <string name="familyhub_cloud_history">History</string>
+    <string name="familyhub_cloud_history_empty">No play history yet.</string>
+    <string name="familyhub_cloud_upload">Upload</string>
+    <string name="familyhub_cloud_uploading">Uploading %1$s...</string>
+    <string name="familyhub_cloud_upload_success">Uploaded %1$s</string>
+    <string name="familyhub_cloud_upload_failed">Upload failed</string>
+    <string name="familyhub_cloud_upload_unsupported_type">Unsupported file type. Use mp3, flac, wav, m4a, ogg or aac.</string>
+    <string name="familyhub_stream">Stream</string>
+    <string name="familyhub_local_music">Local Music</string>
+    <string name="familyhub_local_music_desc">Play music stored on this device.</string>
+    <string name="familyhub_cloud_music_desc">Family cloud library: stream and upload shared music.</string>
+    <string name="familyhub_friends">Friends</string>
+    <string name="familyhub_music_status">Choose local or cloud music</string>
 </resources>

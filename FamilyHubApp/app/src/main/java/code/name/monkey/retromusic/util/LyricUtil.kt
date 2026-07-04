@@ -19,6 +19,9 @@ import code.name.monkey.retromusic.model.lyrics.AbsSynchronizedLyrics
 import org.jaudiotagger.audio.AudioFileIO
 import org.jaudiotagger.tag.FieldKey
 import java.io.*
+import java.nio.ByteBuffer
+import java.nio.charset.CharacterCodingException
+import java.nio.charset.CodingErrorAction
 
 /**
  * Created by hefuyi on 2016/11/8.
@@ -132,17 +135,50 @@ object LyricUtil {
 
     @Throws(Exception::class)
     private fun convertStreamToString(inputStream: InputStream): String {
-        return inputStream.bufferedReader().readLines().joinToString(separator = "\n")
+        return decodeLyrics(inputStream.readBytes())
     }
 
     fun getStringFromLrc(file: File?): String {
         try {
-            val reader = BufferedReader(FileReader(file))
-            return reader.readLines().joinToString(separator = "\n")
+            if (file == null || !file.exists()) return ""
+            return decodeLyrics(file.readBytes())
         } catch (e: Exception) {
             Log.i("Error", "Error Occurred")
         }
         return ""
+    }
+
+    /**
+     * Lyrics files in the wild are not always UTF-8: Chinese players commonly
+     * save .lrc files as GBK/GB18030 and some as UTF-16. Detect BOMs first,
+     * then try strict UTF-8, and fall back to GB18030 for legacy files.
+     */
+    @JvmStatic
+    fun decodeLyrics(bytes: ByteArray): String {
+        if (bytes.size >= 3 &&
+            bytes[0] == 0xEF.toByte() && bytes[1] == 0xBB.toByte() && bytes[2] == 0xBF.toByte()
+        ) {
+            return String(bytes, 3, bytes.size - 3, Charsets.UTF_8)
+        }
+        if (bytes.size >= 2 && bytes[0] == 0xFF.toByte() && bytes[1] == 0xFE.toByte()) {
+            return String(bytes, 2, bytes.size - 2, Charsets.UTF_16LE)
+        }
+        if (bytes.size >= 2 && bytes[0] == 0xFE.toByte() && bytes[1] == 0xFF.toByte()) {
+            return String(bytes, 2, bytes.size - 2, Charsets.UTF_16BE)
+        }
+        return try {
+            Charsets.UTF_8.newDecoder()
+                .onMalformedInput(CodingErrorAction.REPORT)
+                .onUnmappableCharacter(CodingErrorAction.REPORT)
+                .decode(ByteBuffer.wrap(bytes))
+                .toString()
+        } catch (e: CharacterCodingException) {
+            try {
+                String(bytes, charset("GB18030"))
+            } catch (e2: Exception) {
+                String(bytes, Charsets.ISO_8859_1)
+            }
+        }
     }
 
     fun getSyncedLyricsFile(song: Song): File? {

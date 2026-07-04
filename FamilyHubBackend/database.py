@@ -44,6 +44,7 @@ def _migrate() -> None:
         _add_column_if_missing(conn, "users", "max_devices", "max_devices INTEGER NOT NULL DEFAULT 2")
         _add_column_if_missing(conn, "users", "disabled_at", "disabled_at DATETIME")
         _add_column_if_missing(conn, "live_rooms", "heartbeat_at", "heartbeat_at DATETIME")
+        _add_column_if_missing(conn, "tracks", "play_count", "play_count INTEGER NOT NULL DEFAULT 0")
 
         dup = conn.execute(
             text("SELECT nickname, COUNT(*) c FROM users GROUP BY nickname HAVING c > 1")

@@ -1,5 +1,6 @@
 package code.name.monkey.retromusic
 
+import okhttp3.MultipartBody
 import retrofit2.http.*
 
 // Request bodies
@@ -102,7 +103,13 @@ data class CloudTrackInfo(
     val artist: String?,
     val duration_ms: Long?,
     val source: String?,
+    val play_count: Int?,
     val created_at: String?,
+)
+
+data class TrackPlayResponse(
+    val id: String,
+    val play_count: Int,
 )
 
 // Retrofit interface
@@ -221,5 +228,24 @@ interface SyncTuneApi {
     @GET("tracks")
     suspend fun listCloudTracks(
         @Header("X-Token") token: String,
+        @Query("sort") sort: String? = null,
     ): List<CloudTrackInfo>
+
+    @GET("tracks/history")
+    suspend fun listCloudTrackHistory(
+        @Header("X-Token") token: String,
+    ): List<CloudTrackInfo>
+
+    @POST("tracks/{id}/play")
+    suspend fun reportCloudTrackPlay(
+        @Path("id") id: String,
+        @Header("X-Token") token: String,
+    ): TrackPlayResponse
+
+    @Multipart
+    @POST("upload")
+    suspend fun uploadCloudTrack(
+        @Part file: MultipartBody.Part,
+        @Header("X-Token") token: String,
+    ): CloudTrackInfo
 }

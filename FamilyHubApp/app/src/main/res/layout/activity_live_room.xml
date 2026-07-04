@@ -26,6 +26,7 @@
 
     <!-- Top bar: title + status -->
     <LinearLayout
+        android:id="@+id/live_top_bar"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_gravity="top"
@@ -57,6 +58,7 @@
 
     <!-- Bottom controls -->
     <LinearLayout
+        android:id="@+id/live_bottom_controls"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_gravity="bottom"
@@ -76,9 +78,22 @@
                 android:layout_height="48dp"
                 android:layout_weight="1"
                 android:layout_margin="4dp"
-                android:text="Mute"
+                android:text="Mic On"
                 android:textColor="#FFFFFF"
                 android:textSize="11sp"
+                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                app:strokeColor="#AAFFFFFF" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_sys_audio"
+                android:layout_width="0dp"
+                android:layout_height="48dp"
+                android:layout_weight="1"
+                android:layout_margin="4dp"
+                android:text="Sound On"
+                android:textColor="#FFFFFF"
+                android:textSize="11sp"
+                android:visibility="gone"
                 style="@style/Widget.MaterialComponents.Button.OutlinedButton"
                 app:strokeColor="#AAFFFFFF" />
 
@@ -119,6 +134,52 @@
                 app:strokeColor="#AAFFFFFF" />
 
         </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/live_host_audio_controls"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginHorizontal="4dp"
+            android:layout_marginTop="2dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:visibility="gone">
+
+            <TextView
+                android:id="@+id/share_audio_label"
+                android:layout_width="96dp"
+                android:layout_height="wrap_content"
+                android:text="Share 100%"
+                android:textColor="#FFFFFF"
+                android:textSize="12sp" />
+
+            <com.google.android.material.slider.Slider
+                android:id="@+id/share_audio_slider"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:value="100"
+                android:valueFrom="0"
+                android:valueTo="100"
+                android:stepSize="5"
+                app:haloColor="#33FFFFFF"
+                app:thumbColor="#FFFFFF"
+                app:trackColorActive="#FFFFFFFF"
+                app:trackColorInactive="#55FFFFFF" />
+
+        </LinearLayout>
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn_remote_audio"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:layout_margin="4dp"
+            android:text="Sound On"
+            android:textColor="#FFFFFF"
+            android:textSize="12sp"
+            android:visibility="gone"
+            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+            app:strokeColor="#AAFFFFFF" />
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btn_end"

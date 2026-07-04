@@ -122,9 +122,6 @@ class MainActivity : AbsCastActivity() {
             it.setIcon(R.drawable.ic_queue_music)
             it.setShowAsAction(MenuItem.SHOW_AS_ACTION_ALWAYS)
         }
-        menu.add(Menu.NONE, R.id.action_friends, Menu.NONE, "Friends")
-            .setIcon(R.drawable.ic_person_flat)
-            .setShowAsAction(MenuItem.SHOW_AS_ACTION_ALWAYS)
         Log.d(LOG_TAG, "onCreateOptionsMenu: menu items added")
 
         // Observe room role to update room button visibility/title
@@ -150,11 +147,6 @@ class MainActivity : AbsCastActivity() {
     }
 
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
-        if (item.itemId == R.id.action_friends) {
-            Log.i(LOG_TAG, "navigating to FriendsFragment")
-            findNavController(R.id.fragment_container).navigate(R.id.friends_fragment)
-            return true
-        }
         if (item.itemId == R.id.action_room_control) {
             Log.i(LOG_TAG, "opening RoomControlSheet")
             RoomControlSheet.newInstance().show(supportFragmentManager, "RoomControlSheet")
@@ -184,7 +176,7 @@ class MainActivity : AbsCastActivity() {
                 currentFragment(R.id.fragment_container)?.enterTransition = null
             }
             when (destination.id) {
-                R.id.action_familyhub_home, R.id.action_live, R.id.action_cinema, R.id.action_home, R.id.action_more, R.id.action_song, R.id.action_album, R.id.action_artist, R.id.action_folder, R.id.action_playlist, R.id.action_genre, R.id.action_search -> {
+                R.id.action_familyhub_home, R.id.action_live, R.id.action_cinema, R.id.action_familyhub_music, R.id.action_home, R.id.action_more, R.id.action_song, R.id.action_album, R.id.action_artist, R.id.action_folder, R.id.action_playlist, R.id.action_genre, R.id.action_search -> {
                     // Save the last tab
                     if (PreferenceUtil.rememberLastTab) {
                         saveTab(destination.id)

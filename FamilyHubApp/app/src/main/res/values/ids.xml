@@ -33,5 +33,6 @@
     <item name="action_familyhub_home" type="id" />
     <item name="action_live" type="id" />
     <item name="action_cinema" type="id" />
+    <item name="action_familyhub_music" type="id" />
     <item name="action_more" type="id" />
 </resources>

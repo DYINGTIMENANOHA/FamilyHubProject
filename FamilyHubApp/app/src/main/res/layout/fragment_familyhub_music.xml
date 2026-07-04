@@ -15,17 +15,16 @@
         android:paddingBottom="112dp">
 
         <TextView
-            android:id="@+id/familyhub_user_name"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="FamilyHub"
+            android:text="@string/familyhub_music"
             android:textAppearance="@style/TextAppearance.Material3.HeadlineMedium" />
 
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="6dp"
-            android:text="FamilyHub"
+            android:text="@string/familyhub_music_status"
             android:textAppearance="@style/TextAppearance.Material3.BodyMedium" />
 
         <com.google.android.material.card.MaterialCardView
@@ -43,23 +42,23 @@
                 <TextView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="Account"
+                    android:text="@string/familyhub_cloud_music"
                     android:textAppearance="@style/TextAppearance.Material3.TitleMedium" />
 
                 <TextView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="10dp"
-                    android:text="Device ID"
-                    android:textAppearance="@style/TextAppearance.Material3.LabelMedium" />
+                    android:layout_marginTop="6dp"
+                    android:text="@string/familyhub_cloud_music_desc"
+                    android:textAppearance="@style/TextAppearance.Material3.BodyMedium" />
 
-                <TextView
-                    android:id="@+id/familyhub_device_id"
-                    android:layout_width="match_parent"
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/familyhub_music_cloud_action"
+                    android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="4dp"
-                    android:textIsSelectable="true"
-                    android:textAppearance="@style/TextAppearance.Material3.BodySmall" />
+                    android:layout_marginTop="14dp"
+                    android:text="@string/familyhub_open"
+                    android:textAllCaps="false" />
 
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
@@ -79,37 +78,56 @@
                 <TextView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="Services"
+                    android:text="@string/familyhub_local_music"
                     android:textAppearance="@style/TextAppearance.Material3.TitleMedium" />
 
                 <TextView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="10dp"
-                    android:text="Friends, Settings"
+                    android:layout_marginTop="6dp"
+                    android:text="@string/familyhub_local_music_desc"
                     android:textAppearance="@style/TextAppearance.Material3.BodyMedium" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/familyhub_music_local_action"
+                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="14dp"
+                    android:text="@string/familyhub_open"
+                    android:textAllCaps="false" />
 
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="14dp"
+                    android:layout_marginTop="4dp"
                     android:orientation="horizontal">
 
                     <com.google.android.material.button.MaterialButton
-                        android:id="@+id/familyhub_friends_action"
-                        style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-                        android:layout_width="wrap_content"
+                        android:id="@+id/familyhub_music_local_songs"
+                        style="@style/Widget.MaterialComponents.Button.TextButton"
+                        android:layout_width="0dp"
                         android:layout_height="wrap_content"
-                        android:text="@string/familyhub_friends"
+                        android:layout_weight="1"
+                        android:text="@string/songs"
                         android:textAllCaps="false" />
 
                     <com.google.android.material.button.MaterialButton
-                        android:id="@+id/familyhub_settings_action"
-                        style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-                        android:layout_width="wrap_content"
+                        android:id="@+id/familyhub_music_local_favorites"
+                        style="@style/Widget.MaterialComponents.Button.TextButton"
+                        android:layout_width="0dp"
                         android:layout_height="wrap_content"
-                        android:layout_marginStart="10dp"
-                        android:text="@string/action_settings"
+                        android:layout_weight="1"
+                        android:text="@string/favorites"
+                        android:textAllCaps="false" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/familyhub_music_local_playlists"
+                        style="@style/Widget.MaterialComponents.Button.TextButton"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="@string/playlists"
                         android:textAllCaps="false" />
                 </LinearLayout>
 

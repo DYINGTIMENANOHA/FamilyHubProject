@@ -15,7 +15,17 @@ class Track(Base):
     cover_path = Column(String)
     source = Column(String, default="upload")
     uploaded_by = Column(String)
+    play_count = Column(Integer, nullable=False, default=0)
     created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class TrackPlay(Base):
+    __tablename__ = "track_plays"
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    track_id = Column(String, ForeignKey("tracks.id"), nullable=False)
+    user_id = Column(String, ForeignKey("users.id"), nullable=False)
+    played_at = Column(DateTime, default=datetime.utcnow)
 
 
 class User(Base):

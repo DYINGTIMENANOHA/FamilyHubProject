@@ -24,6 +24,8 @@
     <uses-permission android:name="android.permission.BROADCAST_STICKY" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
     <uses-permission
         android:name="android.permission.WRITE_SETTINGS"
         tools:ignore="ProtectedPermissions" />
@@ -34,9 +36,11 @@
         tools:targetApi="s" />
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
 
     <application
         android:name=".App"
+        android:allowAudioPlaybackCapture="true"
         android:allowBackup="@bool/allowBackup"
         android:appCategory="audio"
         android:configChanges="locale|layoutDirection"
@@ -146,8 +150,15 @@
         <activity
             android:name=".activities.LiveRoomActivity"
             android:exported="false"
-            android:screenOrientation="portrait"
             android:configChanges="orientation|screenSize|keyboardHidden" />
+
+        <!-- Extend LiveKit's screen-capture service so microphone (and the playback-capture
+             AudioRecord it feeds) keeps working while this app is in the background during
+             a screen share. Required on Android 14+. -->
+        <service
+            android:name="io.livekit.android.room.track.screencapture.ScreenCaptureService"
+            android:foregroundServiceType="mediaProjection|microphone"
+            tools:replace="android:foregroundServiceType" />
         <activity
             android:name=".activities.CinemaActivity"
             android:configChanges="orientation|screenSize|keyboardHidden"

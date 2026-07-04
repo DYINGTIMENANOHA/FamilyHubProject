@@ -133,17 +133,11 @@ private val dataModule = module {
         )
     } bind Repository::class
 
-    // RemoteTrackRepository is the SongRepository used by LibraryViewModel / ExoPlayer
-    // Must use synctuneHttp (30s timeout) — the default LastFm client only allows 1s
-    single {
-        RemoteTrackRepository(get(named("synctuneHttp")), SyncTuneConfig.SERVER_BASE_URL)
-    } bind SongRepository::class
-
-    // RealSongRepository is kept as concrete type — RealAlbumRepository / RealArtistRepository
-    // / RealGenreRepository etc. all inject it by concrete class, not by the interface
+    // Local MediaStore-backed song repository. Cloud tracks are handled separately
+    // by CloudMusicActivity via SyncTuneApi and must not leak into the local library.
     single {
         RealSongRepository(get())
-    }
+    } bind SongRepository::class
 
     single {
         RealGenreRepository(get(), get())

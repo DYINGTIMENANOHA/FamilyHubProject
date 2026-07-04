@@ -20,7 +20,7 @@
         android:title="@string/familyhub_cinema" />
 
     <item
-        android:id="@+id/action_home"
+        android:id="@+id/action_familyhub_music"
         android:enabled="true"
         android:icon="@drawable/ic_library_music"
         android:title="@string/familyhub_music" />
@@ -28,7 +28,7 @@
     <item
         android:id="@+id/action_more"
         android:enabled="true"
-        android:icon="@drawable/ic_settings"
-        android:title="@string/familyhub_more" />
+        android:icon="@drawable/ic_play_circle_filled"
+        android:title="@string/familyhub_stream" />
 
 </menu>
