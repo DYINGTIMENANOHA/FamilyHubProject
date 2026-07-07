@@ -86,21 +86,20 @@ private data class LiveQualityProfile(
             val normalized = if (quality == "original") "high" else quality
             return if (sourceType == "screen") {
                 when (normalized) {
-                    "extreme" -> LiveQualityProfile("Screen Extreme 1440p120", 2560, 1440, 120, 16_000_000)
-                    "ultra" -> LiveQualityProfile("Screen Ultra 1440p60", 2560, 1440, 60, 12_000_000)
-                    "high" -> LiveQualityProfile("Screen High 1080p60", 1920, 1080, 60, 8_000_000)
-                    "hd" -> LiveQualityProfile("Screen HD 1080p30", 1920, 1080, 30, 5_000_000)
-                    "standard" -> LiveQualityProfile("Screen Standard 720p30", 1280, 720, 30, 2_500_000)
-                    "smooth" -> LiveQualityProfile("Screen Smooth 720p15", 1280, 720, 15, 1_500_000)
-                    else -> LiveQualityProfile("Screen Ultra 1440p60", 2560, 1440, 60, 12_000_000)
+                    "q1440p60", "ultra" -> LiveQualityProfile("Screen 1440p60", 2560, 1440, 60, 12_000_000)
+                    "q1440p30" -> LiveQualityProfile("Screen 1440p30", 2560, 1440, 30, 10_000_000)
+                    "q1080p60", "high" -> LiveQualityProfile("Screen 1080p60", 1920, 1080, 60, 8_000_000)
+                    "q1080p30", "hd" -> LiveQualityProfile("Screen 1080p30", 1920, 1080, 30, 5_000_000)
+                    "q720p60" -> LiveQualityProfile("Screen 720p60", 1280, 720, 60, 4_000_000)
+                    "q720p30", "standard", "smooth" -> LiveQualityProfile("Screen 720p30", 1280, 720, 30, 2_500_000)
+                    else -> LiveQualityProfile("Screen 1440p60", 2560, 1440, 60, 12_000_000)
                 }
             } else {
                 when (normalized) {
-                    "extreme" -> LiveQualityProfile("Camera Ultra 1080p60", 1920, 1080, 60, 8_000_000)
-                    "ultra" -> LiveQualityProfile("Camera Ultra 1080p60", 1920, 1080, 60, 8_000_000)
-                    "high" -> LiveQualityProfile("Camera High 1080p30", 1920, 1080, 30, 5_000_000)
-                    "hd" -> LiveQualityProfile("Camera HD 720p60", 1280, 720, 60, 4_000_000)
-                    "standard" -> LiveQualityProfile("Camera Standard 720p30", 1280, 720, 30, 2_000_000)
+                    "q1440p60", "q1080p60", "ultra" -> LiveQualityProfile("Camera Ultra 1080p60", 1920, 1080, 60, 8_000_000)
+                    "q1440p30", "q1080p30", "high" -> LiveQualityProfile("Camera High 1080p30", 1920, 1080, 30, 5_000_000)
+                    "q720p60", "hd" -> LiveQualityProfile("Camera HD 720p60", 1280, 720, 60, 4_000_000)
+                    "q720p30", "standard" -> LiveQualityProfile("Camera Standard 720p30", 1280, 720, 30, 2_000_000)
                     "smooth" -> LiveQualityProfile("Camera Smooth 480p24", 854, 480, 24, 900_000)
                     else -> LiveQualityProfile("Camera Ultra 1080p60", 1920, 1080, 60, 8_000_000)
                 }
@@ -142,14 +141,47 @@ private class MicGainAudioMixer(
     }
 }
 
-private val liveQualityOptions = listOf(
-    "extreme" to "Extreme",
-    "ultra" to "Ultra",
-    "high" to "High",
-    "hd" to "HD",
-    "standard" to "Standard",
-    "smooth" to "Smooth",
+private data class LiveQualityOption(val key: String, val label: String)
+
+private val screenQualityOptions = listOf(
+    LiveQualityOption("q1440p60", "1440p 60fps"),
+    LiveQualityOption("q1440p30", "1440p 30fps"),
+    LiveQualityOption("q1080p60", "1080p 60fps"),
+    LiveQualityOption("q1080p30", "1080p 30fps"),
+    LiveQualityOption("q720p60", "720p 60fps"),
+    LiveQualityOption("q720p30", "720p 30fps"),
 )
+
+private val cameraQualityOptions = listOf(
+    LiveQualityOption("ultra", "Ultra"),
+    LiveQualityOption("high", "High"),
+    LiveQualityOption("hd", "HD"),
+    LiveQualityOption("standard", "Standard"),
+    LiveQualityOption("smooth", "Smooth"),
+)
+
+private fun liveQualityOptionsForSource(sourceType: String): List<LiveQualityOption> =
+    if (sourceType == "screen") screenQualityOptions else cameraQualityOptions
+
+private fun canonicalQualityForSource(sourceType: String, quality: String): String =
+    if (sourceType == "screen") {
+        when (quality) {
+            "ultra" -> "q1440p60"
+            "high", "original" -> "q1080p60"
+            "hd" -> "q1080p30"
+            "standard", "smooth" -> "q720p30"
+            else -> quality
+        }
+    } else {
+        when (quality) {
+            "q1440p60", "q1080p60" -> "ultra"
+            "q1440p30", "q1080p30" -> "high"
+            "q720p60" -> "hd"
+            "q720p30" -> "standard"
+            "original" -> "high"
+            else -> quality
+        }
+    }
 
 class LiveRoomActivity : AppCompatActivity() {
 
@@ -986,20 +1018,16 @@ class LiveRoomActivity : AppCompatActivity() {
             orientation = RadioGroup.VERTICAL
             setPadding(32, 16, 32, 0)
         }
-        val availableQualityOptions = if (sourceType == "screen") {
-            liveQualityOptions
-        } else {
-            liveQualityOptions.filterNot { (key, _) -> key == "extreme" }
-        }
-        availableQualityOptions.forEach { (key, label) ->
-            val profile = LiveQualityProfile.forRoom(sourceType, key)
-            val option = RadioButton(this).apply {
-                text = "$label - ${profile.label.substringAfter(' ')}"
-                tag = key
+        val availableQualityOptions = liveQualityOptionsForSource(sourceType)
+        val checkedQuality = canonicalQualityForSource(sourceType, quality)
+        availableQualityOptions.forEach { option ->
+            val button = RadioButton(this).apply {
+                text = option.label
+                tag = option.key
                 id = View.generateViewId()
-                isChecked = key == quality
+                isChecked = option.key == checkedQuality
             }
-            group.addView(option)
+            group.addView(button)
         }
 
         AlertDialog.Builder(this)
@@ -1082,7 +1110,10 @@ class LiveRoomActivity : AppCompatActivity() {
     }
 
     private fun updateQualityButtonText() {
-        val label = liveQualityOptions.firstOrNull { it.first == quality }?.second ?: "Ultra"
+        val label = liveQualityOptionsForSource(sourceType)
+            .firstOrNull { it.key == canonicalQualityForSource(sourceType, quality) }
+            ?.label
+            ?: LiveQualityProfile.forRoom(sourceType, quality).label.substringAfter(' ')
         btnQuality.text = label
     }
 

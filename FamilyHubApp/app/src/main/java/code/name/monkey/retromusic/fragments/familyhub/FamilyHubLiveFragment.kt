@@ -26,6 +26,25 @@ import com.google.android.material.snackbar.Snackbar
 import kotlinx.coroutines.launch
 import org.koin.android.ext.android.inject
 
+private data class LiveQualityChoice(val label: String, val value: String)
+
+private val screenQualityChoices = listOf(
+    LiveQualityChoice("1440p 60fps", "q1440p60"),
+    LiveQualityChoice("1440p 30fps", "q1440p30"),
+    LiveQualityChoice("1080p 60fps", "q1080p60"),
+    LiveQualityChoice("1080p 30fps", "q1080p30"),
+    LiveQualityChoice("720p 60fps", "q720p60"),
+    LiveQualityChoice("720p 30fps", "q720p30"),
+)
+
+private val cameraQualityChoices = listOf(
+    LiveQualityChoice("Ultra - 1080p 60fps", "ultra"),
+    LiveQualityChoice("High - 1080p 30fps", "high"),
+    LiveQualityChoice("HD - 720p 60fps", "hd"),
+    LiveQualityChoice("Standard - 720p 30fps", "standard"),
+    LiveQualityChoice("Smooth - weak network fallback", "smooth"),
+)
+
 class FamilyHubLiveFragment : Fragment(R.layout.fragment_familyhub_live) {
     private val api: SyncTuneApi by inject()
     private val adapter = LiveRoomAdapter()
@@ -98,32 +117,30 @@ class FamilyHubLiveFragment : Fragment(R.layout.fragment_familyhub_live) {
         val qualityGroup = RadioGroup(requireContext()).apply {
             orientation = RadioGroup.VERTICAL
         }
-        val qualityOptions = listOf(
-            "Extreme - 1440p 120fps" to "extreme",
-            "Ultra - 1440p 60fps" to "ultra",
-            "High - 1080p high quality" to "high",
-            "HD - 720p high frame rate" to "hd",
-            "Standard - balanced" to "standard",
-            "Smooth - weak network fallback" to "smooth",
-        ).map { (label, value) ->
-            RadioButton(requireContext()).apply {
-                id = View.generateViewId()
-                text = label
-                tag = value
-                isChecked = value == "ultra"
+        val qualityOptions = mutableListOf<RadioButton>()
+        fun populateQualityOptions(sourceType: String, preferredQuality: String? = null) {
+            qualityGroup.removeAllViews()
+            qualityOptions.clear()
+            val choices = if (sourceType == "screen") screenQualityChoices else cameraQualityChoices
+            val fallbackQuality = if (sourceType == "screen") "q1440p60" else "ultra"
+            val selectedQuality = choices.firstOrNull { it.value == preferredQuality }?.value ?: fallbackQuality
+            choices.mapTo(qualityOptions) { choice ->
+                RadioButton(requireContext()).apply {
+                    id = View.generateViewId()
+                    text = choice.label
+                    tag = choice.value
+                    isChecked = choice.value == selectedQuality
+                }
             }
+            qualityOptions.forEach { qualityGroup.addView(it) }
         }
-        qualityOptions.forEach { qualityGroup.addView(it) }
-        val extremeOption = qualityOptions.first { it.tag == "extreme" }
-        fun updateExtremeAvailability(isScreen: Boolean) {
-            extremeOption.visibility = if (isScreen) View.VISIBLE else View.GONE
-            if (!isScreen && extremeOption.isChecked) {
-                qualityOptions.first { it.tag == "ultra" }.isChecked = true
-            }
-        }
-        updateExtremeAvailability(false)
+        populateQualityOptions("camera")
         sourceGroup.setOnCheckedChangeListener { _, checkedId ->
-            updateExtremeAvailability(checkedId == screenOption.id)
+            val currentQuality = qualityOptions
+                .firstOrNull { it.id == qualityGroup.checkedRadioButtonId }
+                ?.tag as? String
+            val sourceType = if (checkedId == screenOption.id) "screen" else "camera"
+            populateQualityOptions(sourceType, currentQuality)
         }
         val content = LinearLayout(requireContext()).apply {
             orientation = LinearLayout.VERTICAL

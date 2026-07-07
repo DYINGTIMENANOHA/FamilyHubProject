@@ -1,3 +1,4 @@
+import json
 import secrets
 import sqlite3
 import time
@@ -5,7 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from urllib.parse import urlencode
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import HTMLResponse, RedirectResponse
 
 from auth import get_current_user
@@ -36,6 +37,7 @@ class LaunchTicket:
 
 
 _launch_tickets: dict[str, LaunchTicket] = {}
+LIVESTREAM_ENVS = {"live", "test"}
 
 
 def _cleanup_launch_tickets() -> None:
@@ -144,6 +146,55 @@ def _livestream_watch_token(env: str) -> str:
     return token
 
 
+def _user_resource_params(user: User) -> dict:
+    raw = (getattr(user, "resource_params", None) or "{}").strip()
+    if not raw:
+        return {}
+    try:
+        parsed = json.loads(raw)
+    except json.JSONDecodeError:
+        return {}
+    return parsed if isinstance(parsed, dict) else {}
+
+
+def _configured_livestream_env(params: dict) -> str | None:
+    livestream = params.get("livestream")
+    if isinstance(livestream, dict):
+        env = str(livestream.get("env") or "").strip().lower()
+        if env in LIVESTREAM_ENVS:
+            return env
+
+    env = str(params.get("livestream_env") or "").strip().lower()
+    if env in LIVESTREAM_ENVS:
+        return env
+    return None
+
+
+def _default_livestream_env(user: User) -> str:
+    params = _user_resource_params(user)
+    configured_env = _configured_livestream_env(params)
+    if configured_env:
+        return configured_env
+    if (getattr(user, "account_type", "") or "").strip().lower() == "test":
+        return "test"
+    return "live"
+
+
+def _resolve_livestream_env(requested_env: str | None, user: User) -> str:
+    default_env = _default_livestream_env(user)
+    normalized = (requested_env or "").strip().lower()
+    if not normalized:
+        return default_env
+    if normalized not in LIVESTREAM_ENVS:
+        raise HTTPException(status_code=400, detail="Invalid livestream env. Use live or test.")
+
+    params = _user_resource_params(user)
+    allow_override = bool(params.get("allow_livestream_env_override"))
+    if normalized == "live" and default_env != "live" and not allow_override:
+        return default_env
+    return normalized
+
+
 def _cinema_admin_token() -> str:
     token = CINEMA_ADMIN_TOKEN.strip() or _read_cinema_admin_token()
     if not token:
@@ -191,8 +242,11 @@ def create_cinema_admin_launch(current_user: User = Depends(get_current_user)):
 
 
 @router.post("/livestream/launch")
-def create_livestream_launch(env: str = "live", current_user: User = Depends(get_current_user)):
-    normalized_env = env.strip().lower()
+def create_livestream_launch(
+    env: str | None = Query(default=None),
+    current_user: User = Depends(get_current_user),
+):
+    normalized_env = _resolve_livestream_env(env, current_user)
     path = "watch" if normalized_env == "live" else "test-watch"
     token = _livestream_watch_token(normalized_env)
     target_url = f"{_livestream_url(path)}?{urlencode({'token': token})}"

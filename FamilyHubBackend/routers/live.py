@@ -17,15 +17,17 @@ from services.livekit_tokens import create_livekit_token
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/live", tags=["live"])
 
+QUALITY_PATTERN = "^(q1440p60|q1440p30|q1080p60|q1080p30|q720p60|q720p30|ultra|high|hd|standard|smooth|original)$"
+
 
 class LiveRoomCreate(BaseModel):
     title: str | None = None
     source_type: str = Field(default="camera", pattern="^(camera|screen)$")
-    quality: str = Field(default="ultra", pattern="^(ultra|high|hd|standard|smooth|original)$")
+    quality: str = Field(default="ultra", pattern=QUALITY_PATTERN)
 
 
 class LiveRoomQualityUpdate(BaseModel):
-    quality: str = Field(pattern="^(ultra|high|hd|standard|smooth|original)$")
+    quality: str = Field(pattern=QUALITY_PATTERN)
 
 
 def _room_payload(room: LiveRoom, owner: User | None = None) -> dict:

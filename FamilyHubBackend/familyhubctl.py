@@ -1,4 +1,5 @@
 import argparse
+import json
 import logging
 import secrets
 import uuid
@@ -26,6 +27,38 @@ def _user(db, nickname: str) -> User:
     return user
 
 
+def _resource_params(user: User) -> dict:
+    raw = (getattr(user, "resource_params", None) or "{}").strip()
+    if not raw:
+        return {}
+    try:
+        parsed = json.loads(raw)
+    except json.JSONDecodeError:
+        return {}
+    return parsed if isinstance(parsed, dict) else {}
+
+
+def _set_resource_params(user: User, params: dict) -> None:
+    user.resource_params = json.dumps(params, sort_keys=True, separators=(",", ":"))
+
+
+def _initial_resource_params(args) -> str:
+    params = {}
+    if args.resource_json:
+        try:
+            parsed = json.loads(args.resource_json)
+        except json.JSONDecodeError as exc:
+            raise SystemExit(f"invalid --resource-json: {exc}") from exc
+        if not isinstance(parsed, dict):
+            raise SystemExit("--resource-json must be a JSON object")
+        params.update(parsed)
+
+    if args.livestream_env:
+        params.setdefault("livestream", {})["env"] = args.livestream_env
+
+    return json.dumps(params, sort_keys=True, separators=(",", ":"))
+
+
 def account_add(args):
     init_db()
     db = SessionLocal()
@@ -40,12 +73,16 @@ def account_add(args):
             password_hash=_hash_password(password),
             token=secrets.token_hex(32),
             status="active",
+            account_type=args.account_type,
+            resource_params=_initial_resource_params(args),
             max_devices=args.max_devices,
         )
         db.add(user)
         db.commit()
         print(f"created account: {user.nickname}")
         print(f"user_id: {user.id}")
+        print(f"account_type: {user.account_type}")
+        print(f"resource_params: {user.resource_params}")
         print(f"max_devices: {user.max_devices}")
         if args.password:
             print("password: <provided>")
@@ -69,7 +106,8 @@ def account_list(args):
                 UserDevice.active.is_(True),
             ).count()
             print(
-                f"{user.nickname}\tstatus={user.status}\tdevices={active_devices}/{user.max_devices}\tcreated={user.created_at}"
+                f"{user.nickname}\tstatus={user.status}\ttype={user.account_type}\t"
+                f"devices={active_devices}/{user.max_devices}\tresources={user.resource_params}\tcreated={user.created_at}"
             )
     finally:
         db.close()
@@ -119,6 +157,56 @@ def account_set_max_devices(args):
         user.max_devices = args.max_devices
         db.commit()
         print(f"updated account: {user.nickname} max_devices={user.max_devices}")
+    finally:
+        db.close()
+
+
+def account_set_type(args):
+    init_db()
+    db = SessionLocal()
+    try:
+        user = _user(db, args.nickname)
+        user.account_type = args.account_type
+        db.commit()
+        print(f"updated account: {user.nickname} account_type={user.account_type}")
+    finally:
+        db.close()
+
+
+def account_set_livestream_env(args):
+    init_db()
+    db = SessionLocal()
+    try:
+        user = _user(db, args.nickname)
+        params = _resource_params(user)
+        livestream = params.setdefault("livestream", {})
+        if args.env == "default":
+            livestream.pop("env", None)
+            if not livestream:
+                params.pop("livestream", None)
+        else:
+            livestream["env"] = args.env
+        _set_resource_params(user, params)
+        db.commit()
+        print(f"updated account: {user.nickname} resource_params={user.resource_params}")
+    finally:
+        db.close()
+
+
+def account_set_resource_json(args):
+    init_db()
+    db = SessionLocal()
+    try:
+        user = _user(db, args.nickname)
+        try:
+            params = json.loads(args.resource_json)
+        except json.JSONDecodeError as exc:
+            raise SystemExit(f"invalid resource_json: {exc}") from exc
+        if not isinstance(params, dict):
+            raise SystemExit("resource_json must be a JSON object")
+        _set_resource_params(user, params)
+        db.commit()
+        print(f"updated account: {user.nickname} resource_params={user.resource_params}")
     finally:
         db.close()
 
@@ -195,6 +283,9 @@ def build_parser():
     add = account_sub.add_parser("add")
     add.add_argument("nickname")
     add.add_argument("--password")
+    add.add_argument("--account-type", default="standard")
+    add.add_argument("--livestream-env", choices=["live", "test"])
+    add.add_argument("--resource-json")
     add.add_argument("--max-devices", type=int, default=DEFAULT_MAX_DEVICES)
     add.set_defaults(func=account_add)
 
@@ -217,6 +308,21 @@ def build_parser():
     maxdev.add_argument("nickname")
     maxdev.add_argument("max_devices", type=int)
     maxdev.set_defaults(func=account_set_max_devices)
+
+    set_type = account_sub.add_parser("set-type")
+    set_type.add_argument("nickname")
+    set_type.add_argument("account_type")
+    set_type.set_defaults(func=account_set_type)
+
+    liveenv = account_sub.add_parser("set-livestream-env")
+    liveenv.add_argument("nickname")
+    liveenv.add_argument("env", choices=["live", "test", "default"])
+    liveenv.set_defaults(func=account_set_livestream_env)
+
+    resource = account_sub.add_parser("set-resource-json")
+    resource.add_argument("nickname")
+    resource.add_argument("resource_json")
+    resource.set_defaults(func=account_set_resource_json)
 
     reset = account_sub.add_parser("reset-password")
     reset.add_argument("nickname")

@@ -41,6 +41,8 @@ def _migrate() -> None:
     with engine.connect() as conn:
         _add_column_if_missing(conn, "users", "password_hash", "password_hash TEXT")
         _add_column_if_missing(conn, "users", "status", "status TEXT NOT NULL DEFAULT 'active'")
+        _add_column_if_missing(conn, "users", "account_type", "account_type TEXT NOT NULL DEFAULT 'standard'")
+        _add_column_if_missing(conn, "users", "resource_params", "resource_params TEXT NOT NULL DEFAULT '{}'")
         _add_column_if_missing(conn, "users", "max_devices", "max_devices INTEGER NOT NULL DEFAULT 2")
         _add_column_if_missing(conn, "users", "disabled_at", "disabled_at DATETIME")
         _add_column_if_missing(conn, "live_rooms", "heartbeat_at", "heartbeat_at DATETIME")

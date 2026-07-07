@@ -222,7 +222,7 @@ interface SyncTuneApi {
     @POST("integrations/livestream/launch")
     suspend fun launchLivestream(
         @Header("X-Token") token: String,
-        @Query("env") env: String = "live",
+        @Query("env") env: String? = null,
     ): IntegrationLaunchResponse
 
     @GET("tracks")

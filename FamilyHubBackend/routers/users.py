@@ -133,6 +133,7 @@ def login(body: LoginRequest, db: Session = Depends(get_db)):
     return {
         "id": user.id,
         "nickname": user.nickname,
+        "account_type": user.account_type,
         "token": token,
         "device_id": device_id,
         "max_devices": max_devices,
@@ -145,6 +146,7 @@ def me(user: User = Depends(get_current_user)):
         "id": user.id,
         "nickname": user.nickname,
         "status": user.status,
+        "account_type": user.account_type,
         "max_devices": user.max_devices,
     }
 

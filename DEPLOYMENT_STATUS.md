@@ -460,6 +460,12 @@ high
 hd
 standard
 smooth
+q1440p60
+q1440p30
+q1080p60
+q1080p30
+q720p60
+q720p30
 original    legacy alias, treated as high by Android
 ```
 
@@ -476,11 +482,20 @@ smooth     480p24  900 Kbps
 Screen-share presets:
 
 ```text
-ultra      1440p30  10 Mbps
-high       1080p60  8 Mbps
-hd         1080p30  5 Mbps
-standard   720p30  2.5 Mbps
-smooth     720p15  1.5 Mbps
+q1440p60   1440p60  12 Mbps
+q1440p30   1440p30  10 Mbps
+q1080p60   1080p60  8 Mbps
+q1080p30   1080p30  5 Mbps
+q720p60     720p60  4 Mbps
+q720p30     720p30  2.5 Mbps
+
+Legacy values are still accepted:
+
+ultra      q1440p60
+high       q1080p60
+hd         q1080p30
+standard   q720p30
+smooth     q720p30
 ```
 
 Important deployment note: Android cloud builds using the quality picker require the cloud backend to be updated too. Older backend code may reject new values such as `ultra`, `high`, `hd`, and `standard` with HTTP 422.
@@ -489,7 +504,7 @@ The host can also change quality while a live room is running. Runtime quality s
 
 ```text
 PATCH /live/rooms/{room_id}/quality
-body: {"quality":"ultra|high|hd|standard|smooth|original"}
+body: {"quality":"q1440p60|q1440p30|q1080p60|q1080p30|q720p60|q720p30|ultra|high|hd|standard|smooth|original"}
 host only
 ```
 
@@ -584,8 +599,24 @@ Keep the existing livestream Flask/SRS code unchanged.
 FamilyHub implementation added:
 
 ```text
+POST /familyhub/integrations/livestream/launch
 POST /familyhub/integrations/livestream/launch?env=live
 POST /familyhub/integrations/livestream/launch?env=test
+```
+
+If `env` is omitted, FamilyHub chooses the livestream room from the account's cloud resource
+parameters. `account_type=test` accounts default to the test livestream room. Accounts can also
+store explicit resource JSON such as `{"livestream":{"env":"test"}}`, which leaves room for future
+account-scoped cloud resources and feature routing.
+
+Account routing commands:
+
+```text
+python familyhubctl.py account add test-user --password ... --account-type test --livestream-env test
+python familyhubctl.py account set-type test-user test
+python familyhubctl.py account set-livestream-env test-user test
+python familyhubctl.py account set-livestream-env test-user default
+python familyhubctl.py account set-resource-json test-user "{\"livestream\":{\"env\":\"test\"}}"
 ```
 
 Cloud/env values:
@@ -602,7 +633,7 @@ Android implementation:
 
 ```text
 FamilyHubApp/app/src/main/java/code/name/monkey/retromusic/activities/LivestreamActivity.kt
-More tab -> OBS Livestream -> existing livestream /watch page in a WebView
+More tab -> OBS Livestream -> existing livestream /watch or /test-watch page in a WebView
 ```
 
 Recommended next order:

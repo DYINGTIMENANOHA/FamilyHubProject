@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime
-from sqlalchemy import Boolean, Column, String, Integer, DateTime, ForeignKey, UniqueConstraint
+from sqlalchemy import Boolean, Column, String, Integer, DateTime, ForeignKey, Text, UniqueConstraint
 from database import Base
 
 
@@ -36,6 +36,8 @@ class User(Base):
     password_hash = Column(String, nullable=True)
     token = Column(String, unique=True, nullable=False)
     status = Column(String, nullable=False, default="active")
+    account_type = Column(String, nullable=False, default="standard")
+    resource_params = Column(Text, nullable=False, default="{}")
     max_devices = Column(Integer, nullable=False, default=2)
     disabled_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)

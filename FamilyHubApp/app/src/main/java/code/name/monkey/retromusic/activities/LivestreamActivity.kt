@@ -128,8 +128,10 @@ class LivestreamActivity : AppCompatActivity() {
             })();
         """
 
-        fun intent(context: Context, env: String = "live"): Intent =
-            Intent(context, LivestreamActivity::class.java).putExtra(EXTRA_ENV, env)
+        fun intent(context: Context, env: String? = null): Intent =
+            Intent(context, LivestreamActivity::class.java).apply {
+                if (!env.isNullOrBlank()) putExtra(EXTRA_ENV, env)
+            }
     }
 
     private val api: SyncTuneApi by inject()
@@ -141,7 +143,7 @@ class LivestreamActivity : AppCompatActivity() {
     private var customViewCallback: WebChromeClient.CustomViewCallback? = null
     private var previousSystemUiVisibility: Int = 0
     private var previousOrientation: Int = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
-    private val env: String by lazy { intent.getStringExtra(EXTRA_ENV)?.lowercase() ?: "live" }
+    private val env: String? by lazy { intent.getStringExtra(EXTRA_ENV)?.lowercase() }
 
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
