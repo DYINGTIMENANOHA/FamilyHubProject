@@ -6,6 +6,8 @@ BACKEND_SERVICE="${BACKEND_SERVICE:-familyhub.service}"
 LIVEKIT_SERVICE="${LIVEKIT_SERVICE:-familyhub-livekit.service}"
 NGINX_SERVICE="${NGINX_SERVICE:-nginx.service}"
 LIVEKIT_CONFIG="${LIVEKIT_CONFIG:-/opt/familyhub/livekit/livekit.yaml}"
+BACKEND_DIR="${BACKEND_DIR:-/opt/familyhub/backend}"
+BACKEND_USER="${BACKEND_USER:-www-data}"
 
 load_env() {
   [ -f "$ENV_FILE" ] || return 0
@@ -37,6 +39,23 @@ Commands:
   livekit-config  Print LiveKit server config
   fix-livekit-ip  Rewrite LiveKit config with explicit node_ip and restart it
   nginx-test      Run nginx -t
+  account <args>  Manage accounts (forwards to familyhubctl.py account <args>)
+  device <args>   Manage devices (forwards to familyhubctl.py device <args>)
+
+Account examples:
+  bash manage-familyhub.sh account add alice --password 'Secret123!'
+  bash manage-familyhub.sh account list
+  bash manage-familyhub.sh account disable alice
+  bash manage-familyhub.sh account enable alice
+  bash manage-familyhub.sh account reset-password alice --password 'NewSecret123!'
+  bash manage-familyhub.sh account set-type alice test
+  bash manage-familyhub.sh account set-livestream-env alice test
+  bash manage-familyhub.sh account delete alice
+  bash manage-familyhub.sh device list alice
+  bash manage-familyhub.sh device kick alice <device_id>
+
+Run 'bash manage-familyhub.sh account --help' or 'account <command> --help'
+for the full list of account/device commands and options.
 EOF
 }
 
@@ -157,6 +176,20 @@ EOF2
   systemctl status "$LIVEKIT_SERVICE" --no-pager -l || true
 }
 
+run_ctl() {
+  if [ ! -f "$ENV_FILE" ]; then
+    echo "Missing env file: $ENV_FILE"
+    exit 1
+  fi
+  if [ ! -x "$BACKEND_DIR/.venv/bin/python" ]; then
+    echo "Missing backend virtualenv: $BACKEND_DIR/.venv/bin/python"
+    exit 1
+  fi
+  # shellcheck disable=SC2046
+  sudo -u "$BACKEND_USER" env $(sudo cat "$ENV_FILE" | xargs) \
+    "$BACKEND_DIR/.venv/bin/python" "$BACKEND_DIR/familyhubctl.py" "$@"
+}
+
 case "${1:-}" in
   status) service_status ;;
   start) service_start ;;
@@ -174,6 +207,8 @@ case "${1:-}" in
   livekit-config) show_livekit_config ;;
   fix-livekit-ip) fix_livekit_ip "${2:-}" ;;
   nginx-test) sudo nginx -t ;;
+  account) shift; run_ctl account "$@" ;;
+  device) shift; run_ctl device "$@" ;;
   ""|-h|--help|help) usage ;;
   *) echo "Unknown command: $1"; echo; usage; exit 1 ;;
 esac

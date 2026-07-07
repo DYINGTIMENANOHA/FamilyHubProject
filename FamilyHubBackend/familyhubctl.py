@@ -273,70 +273,94 @@ def device_kick(args):
         db.close()
 
 
-def build_parser():
-    parser = argparse.ArgumentParser(prog="familyhubctl")
-    sub = parser.add_subparsers(dest="area", required=True)
+EXAMPLES = """\
+examples:
+  familyhubctl.py account add alice --password 'Secret123!'
+  familyhubctl.py account add test-user --password 'Secret123!' --account-type test --livestream-env test
+  familyhubctl.py account list
+  familyhubctl.py account disable alice
+  familyhubctl.py account enable alice
+  familyhubctl.py account reset-password alice --password 'NewSecret123!'
+  familyhubctl.py account set-max-devices alice 5
+  familyhubctl.py account set-type alice test
+  familyhubctl.py account set-livestream-env alice test
+  familyhubctl.py account set-livestream-env alice default
+  familyhubctl.py account set-resource-json alice '{"livestream":{"env":"test"}}'
+  familyhubctl.py account delete alice
+  familyhubctl.py device list alice
+  familyhubctl.py device kick alice <device_id>
+"""
 
-    account = sub.add_parser("account")
+
+def build_parser():
+    parser = argparse.ArgumentParser(
+        prog="familyhubctl",
+        description="Manage FamilyHub accounts and devices from the command line.",
+        epilog=EXAMPLES,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    sub = parser.add_subparsers(dest="area", required=True, metavar="{account,device}")
+
+    account = sub.add_parser("account", help="create, list, and manage accounts")
     account_sub = account.add_subparsers(dest="command", required=True)
 
-    add = account_sub.add_parser("add")
-    add.add_argument("nickname")
-    add.add_argument("--password")
-    add.add_argument("--account-type", default="standard")
-    add.add_argument("--livestream-env", choices=["live", "test"])
-    add.add_argument("--resource-json")
-    add.add_argument("--max-devices", type=int, default=DEFAULT_MAX_DEVICES)
+    add = account_sub.add_parser("add", help="create a new account")
+    add.add_argument("nickname", help="unique login nickname for the account")
+    add.add_argument("--password", help="account password (random one is generated and printed if omitted)")
+    add.add_argument("--account-type", default="standard", help="account type, e.g. standard or test (default: standard)")
+    add.add_argument("--livestream-env", choices=["live", "test"], help="pin this account's livestream room to live or test")
+    add.add_argument("--resource-json", help="initial resource_params as a JSON object")
+    add.add_argument("--max-devices", type=int, default=DEFAULT_MAX_DEVICES, help=f"max concurrent devices (default: {DEFAULT_MAX_DEVICES})")
     add.set_defaults(func=account_add)
 
-    lst = account_sub.add_parser("list")
+    lst = account_sub.add_parser("list", help="list all accounts")
     lst.set_defaults(func=account_list)
 
-    delete = account_sub.add_parser("delete")
+    delete = account_sub.add_parser("delete", help="permanently delete an account and its data")
     delete.add_argument("nickname")
     delete.set_defaults(func=account_delete)
 
-    disable = account_sub.add_parser("disable")
+    disable = account_sub.add_parser("disable", help="disable an account and revoke its active sessions")
     disable.add_argument("nickname")
     disable.set_defaults(func=lambda args: account_status(args, "disabled"))
 
-    enable = account_sub.add_parser("enable")
+    enable = account_sub.add_parser("enable", help="re-enable a disabled account")
     enable.add_argument("nickname")
     enable.set_defaults(func=lambda args: account_status(args, "active"))
 
-    maxdev = account_sub.add_parser("set-max-devices")
+    maxdev = account_sub.add_parser("set-max-devices", help="change the max concurrent device count")
     maxdev.add_argument("nickname")
     maxdev.add_argument("max_devices", type=int)
     maxdev.set_defaults(func=account_set_max_devices)
 
-    set_type = account_sub.add_parser("set-type")
+    set_type = account_sub.add_parser("set-type", help="change the account_type, e.g. standard or test")
     set_type.add_argument("nickname")
     set_type.add_argument("account_type")
     set_type.set_defaults(func=account_set_type)
 
-    liveenv = account_sub.add_parser("set-livestream-env")
+    liveenv = account_sub.add_parser("set-livestream-env", help="route this account to the live/test livestream room, or clear it")
     liveenv.add_argument("nickname")
-    liveenv.add_argument("env", choices=["live", "test", "default"])
+    liveenv.add_argument("env", choices=["live", "test", "default"], help="'default' clears the override")
     liveenv.set_defaults(func=account_set_livestream_env)
 
-    resource = account_sub.add_parser("set-resource-json")
+    resource = account_sub.add_parser("set-resource-json", help="overwrite the account's resource_params JSON")
     resource.add_argument("nickname")
-    resource.add_argument("resource_json")
+    resource.add_argument("resource_json", help="JSON object, e.g. '{\"livestream\":{\"env\":\"test\"}}'")
     resource.set_defaults(func=account_set_resource_json)
 
-    reset = account_sub.add_parser("reset-password")
+    reset = account_sub.add_parser("reset-password", help="reset an account's password and revoke its active sessions")
     reset.add_argument("nickname")
-    reset.add_argument("--password")
+    reset.add_argument("--password", help="new password (random one is generated and printed if omitted)")
     reset.set_defaults(func=account_reset_password)
 
-    device = sub.add_parser("device")
+    device = sub.add_parser("device", help="inspect and kick logged-in devices")
     device_sub = device.add_subparsers(dest="command", required=True)
 
-    dl = device_sub.add_parser("list")
+    dl = device_sub.add_parser("list", help="list devices logged into an account")
     dl.add_argument("nickname")
     dl.set_defaults(func=device_list)
 
-    kick = device_sub.add_parser("kick")
+    kick = device_sub.add_parser("kick", help="force a device to log out")
     kick.add_argument("nickname")
     kick.add_argument("device_id")
     kick.set_defaults(func=device_kick)
@@ -347,6 +371,9 @@ def build_parser():
 def main():
     parser = build_parser()
     args = parser.parse_args()
+    if not hasattr(args, "func"):
+        parser.print_help()
+        raise SystemExit(1)
     args.func(args)
 
 
