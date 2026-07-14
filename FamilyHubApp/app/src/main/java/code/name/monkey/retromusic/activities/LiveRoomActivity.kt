@@ -31,6 +31,7 @@ import code.name.monkey.retromusic.LiveRoomQualityUpdate
 import code.name.monkey.retromusic.SyncTuneSession
 import code.name.monkey.retromusic.BuildConfig
 import code.name.monkey.retromusic.live.LiveShareOverlay
+import code.name.monkey.retromusic.util.PreferenceUtil
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.slider.Slider
 import io.livekit.android.AudioOptions
@@ -246,6 +247,10 @@ class LiveRoomActivity : AppCompatActivity() {
     private var quality = "ultra"
     private var micEnabled = true
     private var micVolume = 1f
+    // "headphones" or "speaker"; decides whether the host's mic session avoids ducking the
+    // system volume (headphones, no echo risk) or keeps the echo-safe call audio path that
+    // ducks other apps as a side effect (speaker, where the mic can pick up playback).
+    private var hostAudioMode = PreferenceUtil.liveHostAudioMode
     private var systemAudioEnabled = true
     private var systemAudioVolume = 1f
     private var remoteAudioMuted = false
@@ -377,12 +382,64 @@ class LiveRoomActivity : AppCompatActivity() {
         updateRemoteAudioButtonText()
         updateQualityButtonText()
 
-        // Viewers only play remote audio; route it through the media stream instead of the
-        // voice-call path so music/system audio isn't degraded by call processing.
-        val overrides = if (isHost) {
-            LiveKitOverrides()
+        if (isHost) {
+            // The mic's audio path decides whether the host's own system volume gets ducked
+            // (see finishSetup), and that trade-off depends on how the host is listening, so
+            // ask before connecting rather than surprising them mid-stream.
+            showHostAudioSetupDialog { mode ->
+                hostAudioMode = mode
+                PreferenceUtil.liveHostAudioMode = mode
+                if (mode == "no_mic") {
+                    // Nothing will be recorded, so there's no echo to guard against and no
+                    // reason to start with the mic hot.
+                    micEnabled = false
+                    btnMic.text = "Mic Off"
+                    updateMicAudioUi()
+                }
+                finishSetup()
+            }
         } else {
+            finishSetup()
+        }
+    }
+
+    /**
+     * Asks the host how they're listening so we know whether it's safe to skip the
+     * echo-safe call audio path (which is what ducks other apps' volume on this device).
+     */
+    private fun showHostAudioSetupDialog(onChosen: (String) -> Unit) {
+        val modes = arrayOf("headphones", "speaker", "no_mic")
+        val labels = arrayOf(
+            "Headphones (wired or Bluetooth) — I'll be talking, other apps keep their normal volume",
+            "Phone speaker or an external speaker — I'll be talking, other apps will automatically get quieter to stop an echo",
+            "No microphone — I won't be talking (e.g. just sharing system/game sound), other apps keep their normal volume",
+        )
+        val preselected = modes.indexOf(hostAudioMode).coerceAtLeast(0)
+        var answered = false
+        AlertDialog.Builder(this)
+            .setTitle("How are you listening to this stream?")
+            .setCancelable(false)
+            .setSingleChoiceItems(labels, preselected) { dialog, which ->
+                // Guards against a double-tap firing this twice before dismiss() takes
+                // effect, which would otherwise run finishSetup() (and room creation) twice.
+                if (answered) return@setSingleChoiceItems
+                answered = true
+                onChosen(modes[which])
+                dialog.dismiss()
+            }
+            .show()
+    }
+
+    private fun finishSetup() {
+        // Viewers only play remote audio; route it through the media stream instead of the
+        // voice-call path so music/system audio isn't degraded by call processing. Hosts get
+        // the same treatment unless they said they'll be talking through the speaker, since
+        // that's the only case with a real echo risk to guard against; that path keeps the
+        // echo-safe call audio, which is what ducks other apps' volume as a side effect.
+        val overrides = if (!isHost || hostAudioMode != "speaker") {
             LiveKitOverrides(audioOptions = AudioOptions(audioOutputType = AudioType.MediaAudioType()))
+        } else {
+            LiveKitOverrides()
         }
         // adaptiveStream is deliberately OFF: it ties received quality to the renderer's
         // view size, which fights the viewer fit/fill layout (feedback loop) and made
@@ -512,6 +569,10 @@ class LiveRoomActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
+        // room is created lazily: for hosts it waits on the audio-setup dialog answer, so
+        // onResume can fire (e.g. right after onCreate, while that dialog is still up) before
+        // it exists.
+        if (!::room.isInitialized) return
         // If the user granted the overlay permission from settings mid-share, attach now.
         if (isHost && sourceType == "screen" && videoEnabled &&
             room.localParticipant.getTrackPublication(Track.Source.SCREEN_SHARE)?.track != null
@@ -671,7 +732,12 @@ class LiveRoomActivity : AppCompatActivity() {
             attachLocalPreview(cameraTrack)
         }
 
-        startMicrophone()
+        // In screen mode the mic track always publishes (it doubles as the system-audio
+        // carrier) and muting is handled at the hardware level instead; in camera mode there's
+        // no such carrier role, so honor "no mic" by simply not publishing it.
+        if (micEnabled) {
+            startMicrophone()
+        }
         statusText.text = "Live"
     }
 
@@ -1221,7 +1287,9 @@ class LiveRoomActivity : AppCompatActivity() {
         heartbeatJob?.cancel()
         roomStatusJob?.cancel()
         detachSystemAudio()
-        room.disconnect()
+        // room is created lazily (see onResume), so it may not exist yet if the activity is
+        // torn down while the host's audio-setup dialog is still up.
+        if (::room.isInitialized) room.disconnect()
         localVideoTrack?.removeRenderer(localPreviewView)
         localVideoTrack?.removeRenderer(remoteVideoView)
         remoteVideoTrack?.removeRenderer(remoteVideoView)

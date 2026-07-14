@@ -60,6 +60,7 @@ import code.name.monkey.retromusic.LAST_DIRECTORY
 import code.name.monkey.retromusic.LAST_SLEEP_TIMER_VALUE
 import code.name.monkey.retromusic.LAST_USED_TAB
 import code.name.monkey.retromusic.LIBRARY_CATEGORIES
+import code.name.monkey.retromusic.LIVE_HOST_AUDIO_MODE
 import code.name.monkey.retromusic.LOCALE_AUTO_STORE_ENABLED
 import code.name.monkey.retromusic.LOCK_SCREEN
 import code.name.monkey.retromusic.LYRICS_OPTIONS
@@ -215,6 +216,16 @@ object PreferenceUtil {
         )
         set(value) = sharedPreferences.edit {
             putBoolean(LOCALE_AUTO_STORE_ENABLED, value)
+        }
+
+    /**
+     * Remembers the host's last answer to "how are you listening to this stream" so the
+     * live room doesn't have to ask again every time. One of "headphones" or "speaker".
+     */
+    var liveHostAudioMode: String
+        get() = sharedPreferences.getStringOrDefault(LIVE_HOST_AUDIO_MODE, "speaker")
+        set(value) = sharedPreferences.edit {
+            putString(LIVE_HOST_AUDIO_MODE, value)
         }
 
     var Fragment.userName
