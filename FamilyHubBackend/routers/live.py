@@ -13,6 +13,7 @@ from database import get_db
 from models import LiveRoom, User
 from services.live_room_cleanup import cleanup_stale_live_rooms
 from services.livekit_tokens import create_livekit_token
+from services.account_scope import account_scope_filter, same_account_scope
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/live", tags=["live"])
@@ -79,7 +80,11 @@ def list_rooms(user: User = Depends(get_current_user), db: Session = Depends(get
     cleanup_stale_live_rooms(db)
     rooms = (
         db.query(LiveRoom)
-        .filter(LiveRoom.status == "live")
+        .join(User, User.id == LiveRoom.owner_id)
+        .filter(
+            LiveRoom.status == "live",
+            account_scope_filter(User.account_type, user),
+        )
         .order_by(LiveRoom.created_at.desc())
         .all()
     )
@@ -130,6 +135,8 @@ def get_room(room_id: str, user: User = Depends(get_current_user), db: Session =
     if not room:
         raise HTTPException(status_code=404, detail="Live room not found")
     owner = db.query(User).filter(User.id == room.owner_id).first()
+    if owner is None or not same_account_scope(user, owner):
+        raise HTTPException(status_code=404, detail="Live room not found")
     return _room_payload(room, owner)
 
 
@@ -139,6 +146,9 @@ def join_room(room_id: str, user: User = Depends(get_current_user), db: Session 
     room = db.query(LiveRoom).filter(LiveRoom.id == room_id, LiveRoom.status == "live").first()
     if not room:
         raise HTTPException(status_code=404, detail="Live room not found or already ended")
+    owner = db.query(User).filter(User.id == room.owner_id).first()
+    if owner is None or not same_account_scope(user, owner):
+        raise HTTPException(status_code=404, detail="Live room not found or already ended")
     role = "host" if room.owner_id == user.id else "viewer"
     logger.info(f"[LIVE] join room={room.id} user={user.nickname!r} role={role}")
     return _token_payload(room, user, role)
@@ -146,11 +156,13 @@ def join_room(room_id: str, user: User = Depends(get_current_user), db: Session 
 
 @router.post("/rooms/{room_id}/heartbeat")
 def heartbeat_room(room_id: str, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    room = db.query(LiveRoom).filter(LiveRoom.id == room_id, LiveRoom.status == "live").first()
+    room = db.query(LiveRoom).filter(
+        LiveRoom.id == room_id,
+        LiveRoom.owner_id == user.id,
+        LiveRoom.status == "live",
+    ).first()
     if not room:
         raise HTTPException(status_code=404, detail="Live room not found or already ended")
-    if room.owner_id != user.id:
-        raise HTTPException(status_code=403, detail="Only the host can heartbeat this live room")
     room.heartbeat_at = datetime.utcnow()
     db.commit()
     return {"detail": "heartbeat", "room_id": room.id}
@@ -163,11 +175,13 @@ def update_room_quality(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    room = db.query(LiveRoom).filter(LiveRoom.id == room_id, LiveRoom.status == "live").first()
+    room = db.query(LiveRoom).filter(
+        LiveRoom.id == room_id,
+        LiveRoom.owner_id == user.id,
+        LiveRoom.status == "live",
+    ).first()
     if not room:
         raise HTTPException(status_code=404, detail="Live room not found or already ended")
-    if room.owner_id != user.id:
-        raise HTTPException(status_code=403, detail="Only the host can update this live room")
     room.quality = body.quality
     room.heartbeat_at = datetime.utcnow()
     db.commit()
@@ -179,11 +193,12 @@ def update_room_quality(
 
 @router.post("/rooms/{room_id}/end")
 def end_room(room_id: str, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    room = db.query(LiveRoom).filter(LiveRoom.id == room_id).first()
+    room = db.query(LiveRoom).filter(
+        LiveRoom.id == room_id,
+        LiveRoom.owner_id == user.id,
+    ).first()
     if not room:
         raise HTTPException(status_code=404, detail="Live room not found")
-    if room.owner_id != user.id:
-        raise HTTPException(status_code=403, detail="Only the host can end this live room")
     if room.status != "ended":
         room.status = "ended"
         room.ended_at = datetime.utcnow()

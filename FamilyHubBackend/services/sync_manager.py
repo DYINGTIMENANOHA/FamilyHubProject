@@ -59,8 +59,7 @@ class SyncTuneConnectionManager:
 
     async def _send_presence_snapshot(self, user_id: str, db) -> None:
         """连接成功后，把所有好友的当前在线状态一次性推给刚上线的用户。"""
-        from models import Friendship
-        friends = db.query(Friendship).filter(Friendship.user_id == user_id).all()
+        friends = self._same_scope_friends(user_id, db)
         logger.debug(
             f"[WS][SNAPSHOT] sending presence snapshot to user_id={user_id} "
             f"friend_count={len(friends)}"
@@ -74,8 +73,7 @@ class SyncTuneConnectionManager:
             })
 
     async def _broadcast_presence(self, user_id: str, online: bool, db) -> None:
-        from models import Friendship
-        friends = db.query(Friendship).filter(Friendship.user_id == user_id).all()
+        friends = self._same_scope_friends(user_id, db)
         msg = {"type": "PRESENCE_UPDATE", "user_id": user_id, "online": online}
         logger.debug(
             f"[WS][PRESENCE] broadcasting: user_id={user_id} online={online} "
@@ -91,6 +89,24 @@ class SyncTuneConnectionManager:
         logger.info(
             f"[WS][PRESENCE] done: user_id={user_id} online={online} "
             f"| notified={sent}/{len(friends)} offline/failed={failed}"
+        )
+
+    @staticmethod
+    def _same_scope_friends(user_id: str, db):
+        from models import Friendship, User
+        from services.account_scope import account_scope_filter
+
+        user = db.query(User).filter(User.id == user_id).first()
+        if user is None:
+            return []
+        return (
+            db.query(Friendship)
+            .join(User, User.id == Friendship.friend_id)
+            .filter(
+                Friendship.user_id == user_id,
+                account_scope_filter(User.account_type, user),
+            )
+            .all()
         )
 
 

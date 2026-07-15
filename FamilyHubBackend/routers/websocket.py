@@ -9,6 +9,7 @@ from database import SessionLocal
 from models import User
 from services.sync_manager import manager
 from services.room_manager import room_manager
+from services.account_scope import account_scope, same_account_scope
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -30,16 +31,21 @@ async def _handle(msg: dict, user: User, db) -> None:
         if not host_id:
             await manager.send_to(uid, {"type": "ERROR", "detail": "missing host_id"})
             return
-        if not manager.is_online(host_id):
-            await manager.send_to(uid, {"type": "ERROR", "detail": "host_offline"})
-            return
         if host_id == uid:
             await manager.send_to(uid, {"type": "ERROR", "detail": "cannot_follow_self"})
             return
 
+        host_user = db.query(User).filter(User.id == host_id).first()
+        if host_user is None or not same_account_scope(user, host_user):
+            await manager.send_to(uid, {"type": "ERROR", "detail": "room_unavailable"})
+            return
+        if not manager.is_online(host_id):
+            await manager.send_to(uid, {"type": "ERROR", "detail": "host_offline"})
+            return
+
         room = room_manager.get_room_by_host(host_id)
         if room is None:
-            room = room_manager.create_room(host_id)
+            room = room_manager.create_room(host_id, account_scope(host_user))
             logger.info(f"[WS][ROOM_JOIN] auto-created room for host={host_id}")
             await manager.send_to(host_id, {
                 "type": "ROOM_STATE",
@@ -49,12 +55,11 @@ async def _handle(msg: dict, user: User, db) -> None:
                 "members": list(room.member_ids),
             })
 
-        room = room_manager.join_room(host_id, uid)
+        room = room_manager.join_room(host_id, uid, account_scope(user))
         if room is None:
             await manager.send_to(uid, {"type": "ERROR", "detail": "join_failed"})
             return
 
-        host_user = db.query(User).filter(User.id == host_id).first()
         host_nickname = host_user.nickname if host_user else host_id
 
         await manager.send_to(uid, {

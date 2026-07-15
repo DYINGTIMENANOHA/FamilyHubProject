@@ -21,6 +21,7 @@ class Room:
     allow_guest_control: bool = False
     last_activity: datetime = field(default_factory=datetime.utcnow)
     member_ids: set = field(default_factory=set)  # includes host
+    account_scope: str = "production"
 
 
 class RoomManager:
@@ -32,9 +33,14 @@ class RoomManager:
 
     # ── Room creation ──────────────────────────────────────────────────────────
 
-    def create_room(self, host_id: str) -> Room:
+    def create_room(self, host_id: str, account_scope: str = "production") -> Room:
         self._force_leave(host_id)
-        room = Room(id=str(uuid.uuid4()), host_id=host_id, member_ids={host_id})
+        room = Room(
+            id=str(uuid.uuid4()),
+            host_id=host_id,
+            member_ids={host_id},
+            account_scope=account_scope,
+        )
         self._rooms[room.id] = room
         self._user_room[host_id] = room.id
         logger.info(f"[ROOM] created room_id={room.id} host={host_id}")
@@ -42,15 +48,26 @@ class RoomManager:
 
     # ── Join / Leave ───────────────────────────────────────────────────────────
 
-    def join_room(self, host_id: str, follower_id: str) -> Optional[Room]:
+    def join_room(
+        self,
+        host_id: str,
+        follower_id: str,
+        account_scope: str = "production",
+    ) -> Optional[Room]:
         if host_id == follower_id:
             logger.warning(f"[ROOM] join_room: cannot follow yourself host={host_id}")
             return None
-        self._force_leave(follower_id)
         room = self.get_room_by_host(host_id)
         if room is None:
             logger.warning(f"[ROOM] join_room: no room for host={host_id}")
             return None
+        if room.account_scope != account_scope:
+            logger.warning(
+                f"[ROOM] join_room: account scope mismatch room={room.id} "
+                f"host_scope={room.account_scope} follower_scope={account_scope}"
+            )
+            return None
+        self._force_leave(follower_id)
         room.member_ids.add(follower_id)
         self._user_room[follower_id] = room.id
         room.last_activity = datetime.utcnow()

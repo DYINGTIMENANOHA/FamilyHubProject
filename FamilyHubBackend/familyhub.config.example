@@ -26,6 +26,10 @@ FAMILYHUB_AUTH_KEYS_DIR=/opt/auth/keys
 # Optional fallback tokens. Prefer reading from the existing auth system instead of hardcoding.
 FAMILYHUB_CINEMA_WATCH_TOKEN=
 FAMILYHUB_CINEMA_ADMIN_TOKEN=
+# Test accounts are routed to this separate Cinema server automatically.
+FAMILYHUB_TEST_CINEMA_BASE_URL=https://cn.streamforsoul.com/cinema/
+FAMILYHUB_TEST_CINEMA_WATCH_TOKEN=b9a75259ab75f1b80489b291a830081f
+FAMILYHUB_TEST_CINEMA_ADMIN_TOKEN=289e17f38e95263d58e51ed499181698
 FAMILYHUB_LIVESTREAM_WATCH_TOKEN=
 FAMILYHUB_LIVESTREAM_TEST_WATCH_TOKEN=
 # Comma-separated FamilyHub nicknames or user ids allowed to launch Cinema admin.

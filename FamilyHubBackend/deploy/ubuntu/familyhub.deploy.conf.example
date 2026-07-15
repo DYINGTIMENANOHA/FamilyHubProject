@@ -19,6 +19,10 @@ INTEGRATION_LAUNCH_TTL_SECONDS=120
 # Optional fallbacks. Prefer keeping these blank so FamilyHub reads existing auth.
 CINEMA_WATCH_TOKEN=
 CINEMA_ADMIN_TOKEN=
+# Test accounts use a separate Cinema server.
+TEST_CINEMA_BASE_URL=https://cn.streamforsoul.com/cinema/
+TEST_CINEMA_WATCH_TOKEN=b9a75259ab75f1b80489b291a830081f
+TEST_CINEMA_ADMIN_TOKEN=289e17f38e95263d58e51ed499181698
 LIVESTREAM_WATCH_TOKEN=
 LIVESTREAM_TEST_WATCH_TOKEN=
 INTEGRATION_ADMINS=alice

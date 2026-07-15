@@ -22,6 +22,9 @@ from config import (
     LIVESTREAM_TEST_WATCH_TOKEN,
     LIVESTREAM_WATCH_TOKEN,
     PUBLIC_BASE_URL,
+    TEST_CINEMA_ADMIN_TOKEN,
+    TEST_CINEMA_BASE_URL,
+    TEST_CINEMA_WATCH_TOKEN,
 )
 from models import User
 
@@ -51,17 +54,6 @@ def _public_url(path: str) -> str:
     return f"{PUBLIC_BASE_URL.rstrip('/')}/{path.lstrip('/')}"
 
 
-def _cinema_url(path: str = "") -> str:
-    if not CINEMA_BASE_URL:
-        raise HTTPException(
-            status_code=503,
-            detail="Cinema base URL is not configured. Set FAMILYHUB_CINEMA_BASE_URL.",
-        )
-    base = CINEMA_BASE_URL.rstrip("/")
-    suffix = path.strip("/")
-    return f"{base}/{suffix}" if suffix else f"{base}/"
-
-
 def _service_url(base_url: str, service_name: str, path: str = "") -> str:
     if not base_url:
         raise HTTPException(
@@ -71,6 +63,11 @@ def _service_url(base_url: str, service_name: str, path: str = "") -> str:
     base = base_url.rstrip("/")
     suffix = path.strip("/")
     return f"{base}/{suffix}" if suffix else f"{base}/"
+
+
+def _cinema_url(path: str = "", *, test: bool = False) -> str:
+    base_url = TEST_CINEMA_BASE_URL if test else CINEMA_BASE_URL
+    return _service_url(base_url, "Test Cinema" if test else "Cinema", path)
 
 
 def _livestream_url(path: str = "") -> str:
@@ -157,6 +154,10 @@ def _user_resource_params(user: User) -> dict:
     return parsed if isinstance(parsed, dict) else {}
 
 
+def _is_test_account(user: User) -> bool:
+    return (getattr(user, "account_type", "") or "").strip().lower() == "test"
+
+
 def _configured_livestream_env(params: dict) -> str | None:
     livestream = params.get("livestream")
     if isinstance(livestream, dict):
@@ -175,7 +176,7 @@ def _default_livestream_env(user: User) -> str:
     configured_env = _configured_livestream_env(params)
     if configured_env:
         return configured_env
-    if (getattr(user, "account_type", "") or "").strip().lower() == "test":
+    if _is_test_account(user):
         return "test"
     return "live"
 
@@ -229,16 +230,26 @@ def _issue_launch_ticket(user: User, target_url: str, mode: str) -> dict[str, ob
 
 @router.post("/cinema/launch")
 def create_cinema_launch(current_user: User = Depends(get_current_user)):
-    target_url = f"{_cinema_url()}?{urlencode({'token': _cinema_watch_token()})}"
-    return _issue_launch_ticket(current_user, target_url, "cinema_watch")
+    test_account = _is_test_account(current_user)
+    token = TEST_CINEMA_WATCH_TOKEN.strip() if test_account else _cinema_watch_token()
+    if not token:
+        raise HTTPException(status_code=503, detail="Test Cinema watch token is not configured")
+    target_url = f"{_cinema_url(test=test_account)}?{urlencode({'token': token})}"
+    mode = "cinema_test_watch" if test_account else "cinema_watch"
+    return _issue_launch_ticket(current_user, target_url, mode)
 
 
 @router.post("/cinema/admin/launch")
 def create_cinema_admin_launch(current_user: User = Depends(get_current_user)):
     if not _is_integration_admin(current_user):
         raise HTTPException(status_code=403, detail="Cinema admin launch is not allowed for this account")
-    target_url = f"{_cinema_url('admin')}?{urlencode({'token': _cinema_admin_token()})}"
-    return _issue_launch_ticket(current_user, target_url, "cinema_admin")
+    test_account = _is_test_account(current_user)
+    token = TEST_CINEMA_ADMIN_TOKEN.strip() if test_account else _cinema_admin_token()
+    if not token:
+        raise HTTPException(status_code=503, detail="Test Cinema admin token is not configured")
+    target_url = f"{_cinema_url('admin', test=test_account)}?{urlencode({'token': token})}"
+    mode = "cinema_test_admin" if test_account else "cinema_admin"
+    return _issue_launch_ticket(current_user, target_url, mode)
 
 
 @router.post("/livestream/launch")

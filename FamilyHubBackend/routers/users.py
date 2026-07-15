@@ -11,6 +11,7 @@ from config import DEFAULT_MAX_DEVICES
 from database import get_db
 from models import AccountSession, Friendship, FriendRequest, User, UserDevice
 from services.sync_manager import manager
+from services.account_scope import account_scope_filter, same_account_scope
 
 logger = logging.getLogger(__name__)
 
@@ -157,7 +158,11 @@ def search_users(q: str, user: User = Depends(get_current_user), db: Session = D
         raise HTTPException(status_code=400, detail="Query too short")
     results = (
         db.query(User)
-        .filter(User.nickname.ilike(f"%{q}%"), User.id != user.id)
+        .filter(
+            User.nickname.ilike(f"%{q}%"),
+            User.id != user.id,
+            account_scope_filter(User.account_type, user),
+        )
         .limit(20)
         .all()
     )
@@ -171,7 +176,10 @@ def search_users(q: str, user: User = Depends(get_current_user), db: Session = D
 def send_friend_request(body: FriendRequestCreate, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     logger.info(f"[FRIEND] request: from={user.id} to_nickname={body.nickname!r}")
 
-    target = db.query(User).filter(User.nickname == body.nickname).first()
+    target = db.query(User).filter(
+        User.nickname == body.nickname,
+        account_scope_filter(User.account_type, user),
+    ).first()
     if not target:
         raise HTTPException(status_code=404, detail="User not found")
     if target.id == user.id:
@@ -213,6 +221,8 @@ def list_friend_requests(user: User = Depends(get_current_user), db: Session = D
     result = []
     for r in reqs:
         sender = db.query(User).filter(User.id == r.from_user_id).first()
+        if sender is None or not same_account_scope(user, sender):
+            continue
         result.append({
             "id": r.id,
             "from_user_id": r.from_user_id,
@@ -235,6 +245,10 @@ def accept_friend_request(request_id: str, user: User = Depends(get_current_user
     if not req:
         raise HTTPException(status_code=404, detail="Friend request not found")
 
+    sender = db.query(User).filter(User.id == req.from_user_id).first()
+    if sender is None or not same_account_scope(user, sender):
+        raise HTTPException(status_code=404, detail="Friend request not found")
+
     req.status = "accepted"
 
     # Create bidirectional friendship
@@ -242,7 +256,6 @@ def accept_friend_request(request_id: str, user: User = Depends(get_current_user
     db.add(Friendship(user_id=req.to_user_id, friend_id=req.from_user_id))
     db.commit()
 
-    sender = db.query(User).filter(User.id == req.from_user_id).first()
     logger.info(
         f"[FRIEND] accepted: request_id={request_id} "
         f"pair=({sender.nickname if sender else req.from_user_id!r} -> {user.nickname!r})"
@@ -262,6 +275,10 @@ def reject_friend_request(request_id: str, user: User = Depends(get_current_user
     if not req:
         raise HTTPException(status_code=404, detail="Friend request not found")
 
+    sender = db.query(User).filter(User.id == req.from_user_id).first()
+    if sender is None or not same_account_scope(user, sender):
+        raise HTTPException(status_code=404, detail="Friend request not found")
+
     req.status = "rejected"
     db.commit()
     logger.info(f"[FRIEND] rejected: request_id={request_id}")
@@ -277,7 +294,7 @@ def list_friends(user: User = Depends(get_current_user), db: Session = Depends(g
     result = []
     for f in friendships:
         friend = db.query(User).filter(User.id == f.friend_id).first()
-        if friend:
+        if friend and same_account_scope(user, friend):
             online = manager.is_online(friend.id)
             result.append({"id": friend.id, "nickname": friend.nickname, "online": online})
     logger.info(
@@ -290,6 +307,10 @@ def list_friends(user: User = Depends(get_current_user), db: Session = Depends(g
 @router.delete("/friends/{friend_id}", status_code=200)
 def remove_friend(friend_id: str, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     logger.info(f"[FRIEND] remove: user={user.id} removing friend={friend_id}")
+
+    friend = db.query(User).filter(User.id == friend_id).first()
+    if friend is None or not same_account_scope(user, friend):
+        raise HTTPException(status_code=404, detail="Friendship not found")
 
     f1 = db.query(Friendship).filter(Friendship.user_id == user.id, Friendship.friend_id == friend_id).first()
     f2 = db.query(Friendship).filter(Friendship.user_id == friend_id, Friendship.friend_id == user.id).first()
@@ -313,6 +334,8 @@ def get_user_state(user_id: str, user: User = Depends(get_current_user), db: Ses
     logger.debug(f"[USER] get_state: target={user_id} requester={user.id}")
     target = db.query(User).filter(User.id == user_id).first()
     if not target:
+        raise HTTPException(status_code=404, detail="User not found")
+    if not same_account_scope(user, target):
         raise HTTPException(status_code=404, detail="User not found")
     online = manager.is_online(target.id)
     # Phase 3 will populate room_id, track_id, position_ms etc.

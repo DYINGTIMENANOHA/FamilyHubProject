@@ -118,7 +118,10 @@ show_config() {
     echo "Missing env file: $ENV_FILE"
     exit 1
   fi
-  sudo sed -E 's/(FAMILYHUB_LIVEKIT_API_SECRET=).*/\1***hidden***/' "$ENV_FILE"
+  sudo sed -E \
+    -e 's/(FAMILYHUB_LIVEKIT_API_SECRET=).*/\1***hidden***/' \
+    -e 's/(FAMILYHUB_.*TOKEN=).*/\1***hidden***/' \
+    "$ENV_FILE"
 }
 
 show_livekit_config() {

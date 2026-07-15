@@ -1,6 +1,6 @@
 # FamilyHub Deployment and Debug Status
 
-Last updated: 2026-07-02
+Last updated: 2026-07-14
 
 This file records the known-good local test setup and the current Ubuntu cloud deployment. Keep it updated whenever ports, domains, deployment scripts, or Android endpoint configuration changes.
 
@@ -164,6 +164,37 @@ bash -n deploy/ubuntu/deploy-familyhub.sh
 bash -n deploy/ubuntu/manage-familyhub.sh
 bash deploy/ubuntu/deploy-familyhub.sh
 ```
+
+### Incremental backend update (account isolation)
+
+TEST and production accounts are isolated by the backend for user search, friend requests,
+friend lists, online presence, music sync rooms, and native LiveKit rooms. Cross-scope targets
+are returned as not found. Existing cross-scope friendship rows are retained in SQLite but are
+hidden and cannot be used.
+
+This update does not require an Android rebuild or a database migration. After copying the
+complete local `FamilyHubBackend` directory to `/opt/FamilyHubBackend` on the cloud server, run:
+
+```bash
+cd /opt/FamilyHubBackend
+python3 -m py_compile main.py routers/users.py routers/websocket.py routers/live.py routers/integrations.py services/account_scope.py services/sync_manager.py services/room_manager.py
+sudo rsync -a \
+  --exclude '.venv' \
+  --exclude '__pycache__' \
+  --exclude 'familyhub.db' \
+  --exclude 'storage' \
+  ./ /opt/familyhub/backend/
+sudo chown -R www-data:www-data /opt/familyhub/backend
+cd /opt/familyhub/backend
+sudo -u www-data .venv/bin/python -m unittest discover -s tests -v
+sudo systemctl restart familyhub.service
+sudo systemctl is-active familyhub.service
+curl -fsS https://streamforsoul.com:8443/familyhub/health
+```
+
+The `rsync` exclusions are mandatory: they preserve the cloud virtual environment, SQLite
+database, and uploaded files. Restarting `familyhub-livekit.service` and nginx is not required
+for this update.
 
 For this server, use the script defaults unless the environment changes. Important defaults:
 

@@ -58,13 +58,9 @@ app.include_router(integrations.router)
 
 @app.get("/health")
 def health():
-    from services.sync_manager import manager
-    from services.room_manager import room_manager
     return {
         "status": "ok",
         "version": API_VERSION,
-        "online_users": manager.online_count(),
-        "active_rooms": room_manager.rooms_info(),
     }
 
 
